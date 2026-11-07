@@ -757,9 +757,26 @@ INDEXNOW_ENGINES = [
     ("IndexNow.org", "https://api.indexnow.org/indexnow"),
 ]
 
+def _host_variants(host):
+    h = host.lower()
+    return [h, h[4:]] if h.startswith("www.") else [h, "www." + h]
+
 def _indexnow_key(site):
     host0 = urllib.parse.urlparse(site).netloc
-    return (load_config().get("indexnow_keys", {}).get(host0) or "").strip()
+    keys = load_config().get("indexnow_keys", {})
+    for h in _host_variants(host0):
+        if (keys.get(h) or "").strip():
+            return keys[h].strip()
+    return ""
+
+def _url_site(site, urls):
+    """Site root on the host the URLs actually use (e.g. www when sitemap lists www URLs)."""
+    sp = urllib.parse.urlparse(site)
+    for u in urls:
+        h = urllib.parse.urlparse(u).netloc.lower()
+        if h in _host_variants(sp.netloc):
+            return f"{urllib.parse.urlparse(u).scheme or 'https'}://{h}/"
+    return site
 
 def indexnow_keyfile_ok(site, key):
     """Checks that https://site/<key>.txt is live and contains the key (engines reject otherwise)."""
@@ -786,7 +803,9 @@ def indexnow_submit(site, urls, engines="all"):
     urls = list(dict.fromkeys([u.strip() for u in urls if u and u.strip()]))
     if not urls:
         raise BingError("Koi URL nahi diya.")
+    site = _url_site(site, urls)
     host = urllib.parse.urlparse(site).netloc
+    urls = [u for u in urls if urllib.parse.urlparse(u).netloc.lower() == host.lower()] or urls
     eng = INDEXNOW_ENGINES if engines == "all" else [e for e in INDEXNOW_ENGINES if e[0] == "IndexNow.org"]
     meaning = {200: "OK", 202: "Accepted (key check pending)", 400: "Bad request", 403: "Key invalid / key file nahi mili",
                422: "URL site se match nahi", 429: "Too many requests"}
@@ -838,8 +857,9 @@ def fast_index(site, urls=None, sitemap=None, days=None, cap=500, skip=None, acc
         if not key:
             out["warnings"].append("IndexNow key nahi hai: Settings me key daalein, tab Yandex/Seznam/Naver ko bhi jayega.")
         else:
-            if not indexnow_keyfile_ok(site, key):
-                out["warnings"].append(f"Key file {site.rstrip('/')}/{key}.txt site par nahi mili. Isko upload karein, warna engines URLs reject kar denge.")
+            ksite = _url_site(site, urls)
+            if not indexnow_keyfile_ok(ksite, key):
+                out["warnings"].append(f"Key file {ksite.rstrip('/')}/{key}.txt site par nahi mili. Isko upload karein, warna engines URLs reject kar denge.")
             try:
                 out["indexnow"] = indexnow_submit(site, urls, "all")
             except BingError as e:
