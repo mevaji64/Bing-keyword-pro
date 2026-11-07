@@ -85,6 +85,11 @@ tbody tr:hover{background:#16203a}td.n,th.n{text-align:right}.tblwrap{max-height
       <div class="card"><h3>Weekly search trend (Bing)</h3><div id="ov-chart"></div></div>
       <div class="card"><h3>Volume by country</h3><div class="tblwrap" style="max-height:330px"><table id="ov-ctry"></table></div></div>
     </div>
+    <div class="card"><h3>Bing SERP — Top 10 ranking URLs <span class="small mut" id="sp-meta"></span></h3>
+      <div id="sp-err" class="err"></div>
+      <div class="tblwrap"><table id="sp-tbl"></table></div>
+      <div class="small mut" style="margin-top:6px"><a id="sp-bing" target="_blank" rel="noopener">Bing par khud dekhein ↗</a> · <a href="#" id="sp-refresh">Refresh</a></div>
+    </div>
     <div class="row"><button class="btn sec" id="ov-toideas">Find keyword ideas for this →</button></div>
   </div>
 </section>
@@ -219,6 +224,12 @@ tbody tr:hover{background:#16203a}td.n,th.n{text-align:right}.tblwrap{max-height
 
 <section class="tab" id="t-settings">
   <div class="card">
+    <h2>SERP Top 10 key (SerpApi)</h2>
+    <div class="small mut">Keyword Overview me Bing ke top 10 ranking URLs dikhane ke liye. Free account: <a href="https://serpapi.com/users/sign_up?plan=free" target="_blank" rel="noopener">serpapi.com</a> (250 searches/month). Har keyword 1-2 search leta hai, result 24 ghante cache rehta hai. Key sirf is browser me save hoti hai.</div>
+    <div class="row" style="margin-top:8px"><input id="st-serp" placeholder="SerpApi API key" style="min-width:380px"><button class="btn" id="st-serpsave">Save</button><button class="btn sec" id="st-serpdel">Remove</button></div>
+    <div id="st-serpinfo" class="small mut" style="margin-top:6px"></div>
+  </div>
+  <div class="card">
     <h2>IndexNow keys (optional, har site ki alag)</h2>
     <div class="row"><select id="st-insite" style="min-width:300px"></select><input id="st-inkey" placeholder="IndexNow key (8-128 chars)" style="min-width:300px"><button class="btn" id="st-insave">Save</button></div>
     <div id="st-inlist" class="small mut" style="margin-top:6px"></div>
@@ -240,7 +251,7 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 let CFG={accounts:[]},SITES=[],MARKETS=[], DATA={ideas:[],questions:[],bulk:[],audit:[],index:[]}, AUDIT={};
 // API keys & settings live in this browser (localStorage) and stay until you remove them
 const LS={get:(k,d)=>{try{return JSON.parse(localStorage.getItem('bkp_'+k))??d}catch(e){return d}},set:(k,v)=>localStorage.setItem('bkp_'+k,JSON.stringify(v))};
-function clientState(){const c={accounts:LS.get('accounts',[]),active:LS.get('active',null),indexnow_keys:LS.get('indexnow',{})};const w=LS.get('world',null);if(w)c.world_markets=w;return c}
+function clientState(){const c={accounts:LS.get('accounts',[]),active:LS.get('active',null),indexnow_keys:LS.get('indexnow',{}),serpapi_key:LS.get('serpapi','')};const w=LS.get('world',null);if(w)c.world_markets=w;return c}
 const maskKey=k=>k.length>8?k.slice(0,4)+'…'+k.slice(-4):'…';
 function addHist(kind,q,market){const hs=LS.get('hist',[]);hs.unshift({kind,q,market,time:new Date().toISOString().slice(0,16).replace('T',' ')});LS.set('hist',hs.slice(0,100))}
 async function api(path,body){if(body)body={...body,_client:clientState()};
@@ -358,8 +369,27 @@ $('#ov-go').onclick=async()=>{const kw=$('#ov-kw').value.trim();if(!kw)return;co
     $('#ov-chart').insertAdjacentHTML('beforeend','<div class="small mut"><span style="color:#2f81f7">●</span> Exact &nbsp; <span style="color:#00b4a6">●</span> Broad (weekly impressions)</div>');
     $('#ov-ctry').innerHTML='<thead><tr><th>Market</th><th class="n">Volume</th><th class="n">Broad</th><th class="n">Share</th></tr></thead><tbody>'+d.countries.map(c=>{const nm=(MARKETS.find(x=>x.country==c.country&&x.language==c.language)||{}).name||c.country;
       return `<tr><td>${nm} <span class="mut small">${c.language}</span>${c.error?` <span class="small" style="color:#ff8a7a" title="${esc(c.error)}">⚠</span>`:''}</td><td class="n">${fmt(c.volume)}</td><td class="n">${fmt(c.broad)}</td><td class="n">${m.volume?(c.volume/m.volume*100).toFixed(1)+'%':'—'}</td></tr>`}).join('')+'</tbody>';
+    loadSerp(kw.toLowerCase(),$('#ov-mkt').value);
   }catch(e){$('#ov-err').textContent=e.message}finally{busy(b,false)}};
 $('#ov-toideas').onclick=()=>{$('#id-kw').value=$('#ov-kw').value;$('#id-mkt').value=$('#ov-mkt').value;go('ideas');$('#id-go').click()};
+
+// ---------- SERP top 10
+function myDomains(){return SITES.map(s=>{try{return new URL(s.url||s).host.replace(/^www\./,'')}catch(e){return ''}}).filter(Boolean)}
+async function loadSerp(kw,market,fresh){const info=$('#sp-meta'),err=$('#sp-err'),t=$('#sp-tbl');err.textContent='';info.textContent='';t.innerHTML='';
+  const lang=market=='world'?'en-US':market.split('|')[1];$('#sp-bing').href='https://www.bing.com/search?q='+encodeURIComponent(kw)+'&setmkt='+lang;
+  if(!LS.get('serpapi','')){err.innerHTML='Top 10 URLs ke liye <a href="#" id="sp-go">Settings</a> me free SerpApi key daalein.';$('#sp-go').onclick=e=>{e.preventDefault();go('settings')};return}
+  t.innerHTML='<tbody><tr><td><span class="spin"></span> Loading…</td></tr></tbody>';
+  try{const d=await api('/api/serp',{keyword:kw,market,fresh:!!fresh});const mine=myDomains();
+    info.textContent=`· ${d.market} · ${d.cached?'cached ':''}${d.fetched}`;
+    if(!d.rows.length){t.innerHTML='';err.textContent='Koi organic result nahi mila.';return}
+    t.innerHTML='<thead><tr><th class="n">#</th><th>Page</th><th>Domain</th></tr></thead><tbody>'+d.rows.map(r=>{const own=mine.some(m=>r.domain==m||r.domain.endsWith('.'+m));
+      return `<tr${own?' style="background:rgba(46,204,113,.12)"':''}><td class="n"><b style="color:${posColor(r.position)}">${r.position}</b></td><td><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title||r.url)}</a><div class="small mut" style="max-width:640px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.url)}</div></td><td>${esc(r.domain)}${own?' <span class="badge b-low">Your site</span>':''}</td></tr>`}).join('')+'</tbody>';
+  }catch(e){t.innerHTML='';err.textContent=e.message}}
+$('#sp-refresh').onclick=e=>{e.preventDefault();const kw=$('#ov-kw').value.trim();if(kw)loadSerp(kw.toLowerCase(),$('#ov-mkt').value,true)};
+function serpInfo(){const k=LS.get('serpapi','');$('#st-serpinfo').textContent=k?'Saved: '+maskKey(k):'Abhi koi key nahi.'}
+$('#st-serpsave').onclick=()=>{const k=$('#st-serp').value.trim();if(k.length<20){$('#st-serpinfo').textContent='Key sahi nahi lag rahi.';return}LS.set('serpapi',k);$('#st-serp').value='';serpInfo()};
+$('#st-serpdel').onclick=()=>{localStorage.removeItem('bkp_serpapi');serpInfo()};
+serpInfo();
 
 // ---------- ideas
 buildFilters('ideas','kw');buildFilters('bulk','kw');buildFilters('audit','audit');buildFilters('index','index');

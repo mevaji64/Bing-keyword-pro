@@ -96,7 +96,7 @@ def load_config():
     cfg.pop("apikey", None)
     ov = getattr(REQ, "ov", None)
     if isinstance(ov, dict):
-        for k in ("accounts", "active", "world_markets", "indexnow_keys"):
+        for k in ("accounts", "active", "world_markets", "indexnow_keys", "serpapi_key"):
             if ov.get(k) is not None:
                 cfg[k] = ov[k]
         cfg["accounts"] = [a for a in cfg["accounts"] if isinstance(a, dict) and a.get("apikey")]
@@ -389,6 +389,57 @@ def overview(q, market, months):
     add_history("overview", q, market)
     return {"metrics": row, "trend": trend, "trend_change_4w": change, "peak_week": yoy_peak,
             "countries": countries, "months": months, "market": market}
+
+# --------------------------------------------------------------------------- SERP top 10 (via SerpApi Bing engine)
+SERP_TTL = 24 * 3600
+
+def serp_top(q, market, n=10, fresh=False):
+    key = (load_config().get("serpapi_key") or "").strip()
+    lang = "en-US" if market == "world" else market.split("|")[1]
+    bing_url = "https://www.bing.com/search?" + urllib.parse.urlencode({"q": q, "setmkt": lang})
+    if not key:
+        raise BingError("SERP ke liye Settings me SerpApi key daalein (free: 250 searches/month).")
+    ck = "serp:" + lang + ":" + q
+    c = None if fresh else cache_get(ck, SERP_TTL)
+    if c is not None:
+        return {**c, "cached": True}
+    rows, seen, first, calls = [], set(), 1, 0
+    while len(rows) < n and calls < 2:
+        params = {"engine": "bing", "q": q, "mkt": lang, "api_key": key}
+        if first > 1:
+            params["first"] = first
+        try:
+            d = json.loads(_http("https://serpapi.com/search.json?" + urllib.parse.urlencode(params), timeout=60))
+        except urllib.error.HTTPError as e:
+            try:
+                msg = json.loads(e.read().decode("utf-8", "replace")).get("error")
+            except Exception:
+                msg = None
+            raise BingError("SerpApi: " + (msg or ("HTTP %s" % e.code)))
+        calls += 1
+        if d.get("error"):
+            if rows:
+                break
+            raise BingError("SerpApi: " + str(d["error"]))
+        org = d.get("organic_results") or []
+        if not org:
+            break
+        for o in org:
+            u = o.get("link") or ""
+            if not u.startswith("http") or u in seen:
+                continue
+            seen.add(u)
+            rows.append({"position": len(rows) + 1, "url": u, "title": o.get("title") or "",
+                         "domain": urllib.parse.urlparse(u).netloc.lower().replace("www.", "", 1),
+                         "snippet": (o.get("snippet") or "")[:240], "date": o.get("date") or ""})
+            if len(rows) >= n:
+                break
+        first += len(org)
+    out = {"keyword": q, "market": lang, "rows": rows, "bing_url": bing_url,
+           "fetched": datetime.now().strftime("%Y-%m-%d %H:%M"), "searches_used": calls}
+    if rows:
+        cache_set(ck, out)
+    return {**out, "cached": False}
 
 def ideas(q, market, months, limit, deep, include_related=True, include_suggest=True):
     markets = market_split(market)
@@ -834,6 +885,9 @@ class Handler(BaseHTTPRequestHandler):
             if p == "/api/overview":
                 if not q: raise BingError("Keyword daalein.")
                 return self._send(200, overview(q.lower(), market, months))
+            if p == "/api/serp":
+                if not q: raise BingError("Keyword daalein.")
+                return self._send(200, serp_top(q.lower(), market, fresh=bool(data.get("fresh"))))
             if p == "/api/ideas":
                 if not q: raise BingError("Keyword daalein.")
                 return self._send(200, ideas(q.lower(), market, months, max(10, min(500, int(data.get("limit") or 100))),
