@@ -1,0 +1,21 @@
+name: Auto Fast Index
+# Roz sitemap ke naye URLs Bing Webmaster + IndexNow (Bing, Yandex, Seznam, Naver, Yep) ko bhejta hai.
+# Setup: repo Settings -> Secrets and variables -> Actions -> New secret "BKP_AUTO" (JSON, README dekhein).
+on:
+  schedule:
+    - cron: "30 3 * * *"   # roz 9:00 AM IST
+  workflow_dispatch:
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fast index new URLs
+        env:
+          BKP_AUTO: ${{ secrets.BKP_AUTO }}
+          BKP_DATA_DIR: /tmp/bkp
+        run: python auto_index.py

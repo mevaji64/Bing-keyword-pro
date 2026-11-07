@@ -676,8 +676,21 @@ def url_status(site, url, acct=None):
     return {"url": url, "status": st, "indexed": idx, "http": http, "last_crawled": lc, "discovered": disc,
             "doc_size": d.get("DocumentSize"), "anchors": d.get("AnchorCount"), "traffic": traffic, "detail": ""}
 
-def sitemap_urls(sitemap_url, cap=2000, _depth=0):
-    urls = []
+def _parse_lastmod(v):
+    v = (v or "").strip()
+    if not v:
+        return None
+    try:
+        if len(v) == 10:
+            return datetime.strptime(v, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        d = datetime.fromisoformat(v.replace("Z", "+00:00"))
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+def sitemap_entries(sitemap_url, cap=2000, _depth=0):
+    """Returns [(url, lastmod_datetime_or_None)] from a sitemap or sitemap index."""
+    out = []
     try:
         xml = _http(sitemap_url, timeout=40)
     except Exception as e:
@@ -686,20 +699,34 @@ def sitemap_urls(sitemap_url, cap=2000, _depth=0):
     try:
         root = ET.fromstring(xml.encode("utf-8"))
     except ET.ParseError:
-        return re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", xml)[:cap]
+        return [(u, None) for u in re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", xml)[:cap]]
     if root.tag.endswith("sitemapindex") and _depth < 2:
-        for loc in root.iter("loc"):
-            if len(urls) >= cap:
+        for sm in root.iter("sitemap"):
+            if len(out) >= cap:
                 break
+            loc = sm.find("loc")
+            if loc is None or not loc.text:
+                continue
             try:
-                urls += sitemap_urls(loc.text.strip(), cap - len(urls), _depth + 1)
+                out += sitemap_entries(loc.text.strip(), cap - len(out), _depth + 1)
             except BingError:
                 pass
     else:
-        for loc in root.iter("loc"):
-            if loc.text:
-                urls.append(loc.text.strip())
-    return urls[:cap]
+        for u in root.iter("url"):
+            loc = u.find("loc")
+            if loc is not None and loc.text:
+                lm = u.find("lastmod")
+                out.append((loc.text.strip(), _parse_lastmod(lm.text if lm is not None else "")))
+        if not out:
+            out = [(l.text.strip(), None) for l in root.iter("loc") if l.text]
+    return out[:cap]
+
+def sitemap_urls(sitemap_url, cap=2000, days=None):
+    ents = sitemap_entries(sitemap_url, 50000 if days else cap)
+    if days:
+        cut = datetime.now(timezone.utc) - timedelta(days=float(days))
+        ents = sorted([e for e in ents if e[1] and e[1] >= cut], key=lambda e: e[1], reverse=True)
+    return [u for u, _ in ents][:cap]
 
 def check_urls(site, urls, acct=None):
     urls = list(dict.fromkeys([u.strip() for u in urls if u.strip()]))[:2000]
@@ -721,20 +748,103 @@ def submit_urls(site, urls, acct=None):
         results += chunk
     return {"submitted": len(results)}
 
-def indexnow_submit(site, urls):
+INDEXNOW_ENGINES = [
+    ("Bing", "https://www.bing.com/indexnow"),
+    ("Yandex", "https://yandex.com/indexnow"),
+    ("Seznam", "https://search.seznam.cz/indexnow"),
+    ("Naver", "https://searchadvisor.naver.com/indexnow"),
+    ("Yep", "https://indexnow.yep.com/indexnow"),
+    ("IndexNow.org", "https://api.indexnow.org/indexnow"),
+]
+
+def _indexnow_key(site):
     host0 = urllib.parse.urlparse(site).netloc
-    key = (load_config().get("indexnow_keys", {}).get(host0) or "").strip()
-    if not key:
-        raise BingError("Is site ki IndexNow key Settings me daalein (aur key file apni site ke root par upload karein).")
-    host = urllib.parse.urlparse(site).netloc
-    body = {"host": host, "key": key, "keyLocation": f"{site.rstrip('/')}/{key}.txt", "urlList": urls[:10000]}
-    req = urllib.request.Request("https://api.indexnow.org/indexnow", data=json.dumps(body).encode(),
+    return (load_config().get("indexnow_keys", {}).get(host0) or "").strip()
+
+def indexnow_keyfile_ok(site, key):
+    """Checks that https://site/<key>.txt is live and contains the key (engines reject otherwise)."""
+    try:
+        return key in _http(f"{site.rstrip('/')}/{key}.txt", timeout=15)
+    except Exception:
+        return False
+
+def _indexnow_post(endpoint, body):
+    req = urllib.request.Request(endpoint, data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json; charset=utf-8", "User-Agent": UA})
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
-            return {"status": r.status, "submitted": len(body["urlList"])}
+            return r.status, ""
     except urllib.error.HTTPError as e:
-        raise BingError(f"IndexNow HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:200]}")
+        return e.code, e.read().decode("utf-8", "replace")[:160]
+    except Exception as e:
+        return 0, str(e)[:160]
+
+def indexnow_submit(site, urls, engines="all"):
+    key = _indexnow_key(site)
+    if not key:
+        raise BingError("Is site ki IndexNow key Settings me daalein (aur key file apni site ke root par upload karein).")
+    urls = list(dict.fromkeys([u.strip() for u in urls if u and u.strip()]))
+    if not urls:
+        raise BingError("Koi URL nahi diya.")
+    host = urllib.parse.urlparse(site).netloc
+    eng = INDEXNOW_ENGINES if engines == "all" else [e for e in INDEXNOW_ENGINES if e[0] == "IndexNow.org"]
+    meaning = {200: "OK", 202: "Accepted (key check pending)", 400: "Bad request", 403: "Key invalid / key file nahi mili",
+               422: "URL site se match nahi", 429: "Too many requests"}
+    res = []
+    def one(e):
+        name, ep = e
+        sent, last, err = 0, 0, ""
+        for i in range(0, len(urls), 10000):
+            chunk = urls[i:i + 10000]
+            body = {"host": host, "key": key, "keyLocation": f"{site.rstrip('/')}/{key}.txt", "urlList": chunk}
+            last, err = _indexnow_post(ep, body)
+            if last in (200, 202):
+                sent += len(chunk)
+            else:
+                break
+        return {"engine": name, "status": last, "ok": last in (200, 202), "sent": sent,
+                "note": meaning.get(last, err or "Error")}
+    with ThreadPoolExecutor(len(eng)) as ex:
+        res = list(ex.map(one, eng))
+    ok = [r for r in res if r["ok"]]
+    return {"status": ok[0]["status"] if ok else (res[0]["status"] if res else 0),
+            "submitted": max([r["sent"] for r in res] or [0]), "engines": res}
+
+def fast_index(site, urls=None, sitemap=None, days=None, cap=500, skip=None, acct=None, use_bing=True, use_indexnow=True):
+    """One-click: collect URLs (new ones from sitemap lastmod), submit to Bing Webmaster within quota + IndexNow to all engines."""
+    urls = [u.strip() for u in (urls or []) if u and u.strip()]
+    if sitemap:
+        urls += sitemap_urls(sitemap, int(cap or 500), days=days or None)
+    skip = set(skip or [])
+    urls = [u for u in dict.fromkeys(urls) if u not in skip][: int(cap or 500)]
+    out = {"urls": urls, "total": len(urls), "bing": None, "indexnow": None, "warnings": []}
+    if not urls:
+        out["warnings"].append("Koi naya URL nahi mila" + (f" (pichhle {days} din ke lastmod me)" if days else "") + ".")
+        return out
+    if use_bing:
+        try:
+            q = bing_api("GetUrlSubmissionQuota", {"siteUrl": site}, use_cache=False, account=acct) or {}
+            daily = q.get("DailyQuota")
+            n = len(urls) if daily is None else max(0, min(len(urls), int(daily)))
+            if n:
+                submit_urls(site, urls[:n], acct)
+            out["bing"] = {"submitted": n, "left_out": len(urls) - n, "daily_quota_before": daily}
+            if n < len(urls):
+                out["warnings"].append(f"Bing daily quota khatam: {len(urls) - n} URLs kal submit karein (IndexNow se sab gaye).")
+        except BingError as e:
+            out["bing"] = {"submitted": 0, "error": str(e)}
+    if use_indexnow:
+        key = _indexnow_key(site)
+        if not key:
+            out["warnings"].append("IndexNow key nahi hai: Settings me key daalein, tab Yandex/Seznam/Naver ko bhi jayega.")
+        else:
+            if not indexnow_keyfile_ok(site, key):
+                out["warnings"].append(f"Key file {site.rstrip('/')}/{key}.txt site par nahi mili. Isko upload karein, warna engines URLs reject kar denge.")
+            try:
+                out["indexnow"] = indexnow_submit(site, urls, "all")
+            except BingError as e:
+                out["indexnow"] = {"error": str(e)}
+    return out
 
 # --------------------------------------------------------------------------- HTTP server
 class Handler(BaseHTTPRequestHandler):
@@ -916,12 +1026,16 @@ class Handler(BaseHTTPRequestHandler):
             if p == "/api/site/check-urls":
                 urls = data.get("urls") or []
                 if data.get("sitemap"):
-                    urls = sitemap_urls(data["sitemap"].strip(), int(data.get("cap") or 500))
+                    urls = sitemap_urls(data["sitemap"].strip(), int(data.get("cap") or 500), days=data.get("days") or None)
                 return self._send(200, check_urls(site, urls, acct))
             if p == "/api/site/submit":
                 return self._send(200, submit_urls(site, data.get("urls") or [], acct))
             if p == "/api/site/indexnow":
-                return self._send(200, indexnow_submit(site, data.get("urls") or []))
+                return self._send(200, indexnow_submit(site, data.get("urls") or [], data.get("engines") or "all"))
+            if p == "/api/site/fast-index":
+                return self._send(200, fast_index(site, data.get("urls") or [], (data.get("sitemap") or "").strip() or None,
+                                                  data.get("days") or None, int(data.get("cap") or 500), data.get("skip") or [],
+                                                  acct, data.get("bing", True) is not False, data.get("indexnow", True) is not False))
             return self._send(404, {"error": "not found"})
         except BingError as e:
             return self._send(400, {"error": str(e)})

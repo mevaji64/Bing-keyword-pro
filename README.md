@@ -33,7 +33,7 @@ Multiple Bing Webmaster API keys (one per account) are supported and stay saved 
 | **Questions** | Question keywords (what / how / why / kya / kaise …) from your ideas |
 | **Bulk Analyzer** | Paste up to 1,000 keywords, get volume + KD + competition + intent for all |
 | **Site Audit** | For every site in your connected accounts: ranking keywords with latest & average Bing position, position change, impressions, clicks, CTR; top pages; striking-distance keywords (pos 4-20); which pages rank for a keyword; crawl issues; pages in index; submit quota |
-| **URL Index** | Paste URLs or a sitemap → Bing index/crawl status per URL (HTTP, last crawled, discovered, impressions, clicks). Submit not-indexed URLs to Bing (Webmaster URL submission) or via IndexNow |
+| **URL Index** | Paste URLs or a sitemap → Bing index/crawl status per URL (HTTP, last crawled, discovered, impressions, clicks). Submit not-indexed URLs to Bing (Webmaster URL submission) or via IndexNow. **⚡ Fast Index**: one click sends URLs to Bing Webmaster (within daily quota) + IndexNow to Bing, Yandex, Seznam, Naver, Yep; can pick only new URLs from sitemap `lastmod` and skips URLs already sent |
 | **API Accounts** | Add / rename / replace / remove multiple Bing Webmaster API keys. Sites are auto-mapped to the right key |
 | **Settings** | Worldwide market list, per-site IndexNow keys, clear cache |
 
@@ -91,3 +91,30 @@ GitHub Pages cannot run this tool, because Bing's API blocks direct browser call
 `SubmitUrl`, `SubmitUrlBatch` (JSON endpoint `https://ssl.bing.com/webmaster/api.svc/json/`), Bing autosuggest, IndexNow.
 
 License: MIT
+
+
+---
+
+## ⚡ Fast Index + रोज़ ऑटो इंडेक्स
+
+**टूल में:** URL Index टैब → sitemap डालें → "Sirf naye: pichhle 1 din" चुनें → **⚡ Fast Index**।
+यह URLs को Bing Webmaster (daily quota तक) और IndexNow से Bing, Yandex, Seznam, Naver, Yep को एक साथ भेजता है।
+IndexNow के लिए Settings में site की key डालें और `https://आपकी-साइट/<key>.txt` फ़ाइल (अंदर सिर्फ key) साइट के root पर अपलोड करें।
+
+**रोज़ अपने आप (GitHub Actions, फ्री):** repo → Settings → Secrets and variables → Actions → New repository secret →
+नाम `BKP_AUTO`, value:
+
+```json
+{
+  "bing_api_key": "आपकी Bing Webmaster API key",
+  "days": 2,
+  "sites": [
+    {"site": "https://example.com/", "sitemap": "https://example.com/sitemap.xml", "indexnow_key": "आपकी IndexNow key"}
+  ]
+}
+```
+
+कई अकाउंट हों तो `"bing_api_keys": ["key1", "key2"]` लिखें। Workflow रोज़ 9:00 AM IST चलता है (Actions → Auto Fast Index → Run workflow से अभी भी चला सकते हैं)।
+Sitemap में `lastmod` होना ज़रूरी है, वरना नए URL पहचाने नहीं जाएंगे। Secret private रहता है, public repo में दिखता नहीं।
+
+Note: Bing/IndexNow सिर्फ crawl जल्दी करवाते हैं; index करना या न करना search engine तय करता है।

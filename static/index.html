@@ -190,15 +190,19 @@ tbody tr:hover{background:#16203a}td.n,th.n{text-align:right}.tblwrap{max-height
     <div class="row"><select id="ix-site" style="min-width:320px"><option value="">— Site chunein (Site Audit me "Load sites") —</option></select>
       <input id="ix-site-manual" placeholder="ya site URL: https://example.com/" style="min-width:280px"></div>
     <div class="row" style="margin-top:10px"><input class="big" id="ix-sitemap" placeholder="Sitemap URL (optional) e.g. https://example.com/sitemap.xml">
-      <select id="ix-cap"><option value="100">max 100 URLs</option><option value="300">max 300</option><option value="500" selected>max 500</option><option value="1000">max 1000</option><option value="2000">max 2000</option></select></div>
+      <select id="ix-cap"><option value="100">max 100 URLs</option><option value="300">max 300</option><option value="500" selected>max 500</option><option value="1000">max 1000</option><option value="2000">max 2000</option></select>
+      <select id="ix-days" title="Sitemap ke lastmod se sirf naye/updated URLs"><option value="">Sab URLs</option><option value="1">Sirf naye: pichhle 1 din</option><option value="3">pichhle 3 din</option><option value="7">pichhle 7 din</option><option value="30">pichhle 30 din</option></select></div>
     <div style="margin-top:10px"><textarea id="ix-urls" placeholder="Ya URLs yahan paste karein (ek line me ek)"></textarea></div>
     <div class="row" style="margin-top:10px">
+      <button class="btn green" id="ix-fast" title="Bing Webmaster (quota tak) + IndexNow: Bing, Yandex, Seznam, Naver, Yep">⚡ Fast Index (sab engines)</button>
+      <label class="small"><input type="checkbox" id="ix-skip" checked> pehle bheje URLs skip</label>
       <button class="btn" id="ix-check">Check index status</button>
       <button class="btn green" id="ix-submit">Submit to Bing (Webmaster)</button>
       <button class="btn sec" id="ix-indexnow">Submit via IndexNow</button>
       <span class="mut small" id="ix-quota"></span>
     </div>
     <div id="ix-err" class="err"></div><div id="ix-ok" class="ok"></div>
+    <div id="ix-fast-out" style="display:none;margin-top:10px"><table id="tbl-fast"></table><div id="ix-warn" class="err small"></div></div>
   </div>
   <div class="card" id="ix-out" style="display:none">
     <div class="row" style="justify-content:space-between"><h2 id="ix-title"></h2>
@@ -451,7 +455,7 @@ function ixAcc(){return $('#ix-site-manual').value.trim()?null:accOf('#ix-site')
 $('#ix-check').onclick=async()=>{const site=ixSite();$('#ix-err').textContent='';$('#ix-ok').textContent='';if(!site){$('#ix-err').textContent='Site chunein ya likhein.';return}
   const urls=$('#ix-urls').value.split('\n').filter(x=>x.trim()),sm=$('#ix-sitemap').value.trim();if(!urls.length&&!sm){$('#ix-err').textContent='Sitemap URL ya URLs daalein.';return}
   const b=$('#ix-check');busy(b,true,'Checking');
-  try{const d=await api('/api/site/check-urls',{site,account:ixAcc(),urls,sitemap:sm||null,cap:$('#ix-cap').value});DATA.index=d.rows;$('#ix-out').style.display='';
+  try{const d=await api('/api/site/check-urls',{site,account:ixAcc(),urls,sitemap:sm||null,cap:$('#ix-cap').value,days:$('#ix-days').value||null});DATA.index=d.rows;$('#ix-out').style.display='';
     $('#ix-title').innerHTML=`${d.indexed} / ${d.total} URLs indexed <span class="mut small">· ${d.total-d.indexed} not indexed</span>`;refresh('index')}catch(e){$('#ix-err').textContent=e.message}finally{busy(b,false)}};
 $('#ix-sel-not').onclick=()=>$$('.ixsel').forEach(c=>{const r=DATA.index.find(x=>x.url==c.value);c.checked=r&&!r.indexed});
 function chosenUrls(){const sel=$$('.ixsel:checked').map(c=>c.value);return sel.length?sel:$('#ix-urls').value.split('\n').filter(x=>x.trim())}
@@ -460,6 +464,24 @@ $('#ix-submit').onclick=async()=>{const site=ixSite(),urls=chosenUrls();$('#ix-e
   try{const d=await api('/api/site/submit',{site,urls,account:ixAcc()});$('#ix-ok').textContent=`✓ ${d.submitted} URLs Bing Webmaster ko submit ho gaye.`}catch(e){$('#ix-err').textContent=e.message}finally{busy(b,false)}};
 $('#ix-indexnow').onclick=async()=>{const site=ixSite(),urls=chosenUrls();$('#ix-err').textContent='';$('#ix-ok').textContent='';if(!site||!urls.length){$('#ix-err').textContent='Site aur URLs chahiye.';return}
   const b=$('#ix-indexnow');busy(b,true,'Sending');try{const d=await api('/api/site/indexnow',{site,urls});$('#ix-ok').textContent=`✓ IndexNow: ${d.submitted} URLs bheje (HTTP ${d.status}).`}catch(e){$('#ix-err').textContent=e.message}finally{busy(b,false)}};
+
+function sentKey(site){try{return 'sent_'+new URL(site).host}catch(e){return 'sent_x'}}
+$('#ix-fast').onclick=async()=>{const site=ixSite();$('#ix-err').textContent='';$('#ix-ok').textContent='';$('#ix-warn').textContent='';
+  if(!site){$('#ix-err').textContent='Site chunein ya likhein.';return}
+  const sel=$$('.ixsel:checked').map(c=>c.value),urls=sel.length?sel:$('#ix-urls').value.split('\n').filter(x=>x.trim()),sm=$('#ix-sitemap').value.trim();
+  if(!urls.length&&!sm){$('#ix-err').textContent='Sitemap URL ya URLs daalein.';return}
+  const sent=LS.get(sentKey(site),{}),skip=$('#ix-skip').checked?Object.keys(sent):[];
+  const b=$('#ix-fast');busy(b,true,'Indexing');
+  try{const d=await api('/api/site/fast-index',{site,account:ixAcc(),urls,sitemap:sm||null,days:$('#ix-days').value||null,cap:$('#ix-cap').value,skip});
+    const now=new Date().toISOString().slice(0,10);let anyOk=false;
+    const rows=[];if(d.bing)rows.push(['Bing Webmaster',d.bing.error?'✗':'✓',d.bing.error?0:d.bing.submitted,d.bing.error||(d.bing.left_out?`${d.bing.left_out} quota se bahar`:'OK')]);
+    if(d.indexnow&&d.indexnow.engines)d.indexnow.engines.forEach(e=>{if(e.ok)anyOk=true;rows.push(['IndexNow → '+e.engine,e.ok?'✓':'✗',e.sent,`HTTP ${e.status} ${e.note}`])});
+    else if(d.indexnow&&d.indexnow.error)rows.push(['IndexNow','✗',0,d.indexnow.error]);
+    if((d.bing&&d.bing.submitted)||anyOk){d.urls.forEach(u=>sent[u]=now);const ks=Object.keys(sent);if(ks.length>20000)ks.slice(0,ks.length-20000).forEach(k=>delete sent[k]);LS.set(sentKey(site),sent)}
+    $('#tbl-fast').innerHTML='<thead><tr><th>Engine</th><th></th><th class="n">URLs</th><th>Status</th></tr></thead><tbody>'+rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${r[1]}</td><td class="n">${fmt(r[2])}</td><td>${esc(r[3])}</td></tr>`).join('')+'</tbody>';
+    $('#ix-fast-out').style.display=rows.length?'':'none';$('#ix-warn').innerHTML=(d.warnings||[]).map(esc).join('<br>');
+    $('#ix-ok').textContent=d.total?`✓ ${d.total} URLs bheje. 1-2 din baad "Check index status" se dekhein.`:''}
+  catch(e){$('#ix-err').textContent=e.message}finally{busy(b,false)}};
 
 // ---------- history
 async function loadHistory(){const h=LS.get('hist',[]);$('#tbl-history').innerHTML='<thead><tr><th>Time</th><th>Type</th><th>Query</th><th>Market</th></tr></thead><tbody>'+h.map(r=>`<tr><td>${r.time}</td><td>${r.kind}</td><td><a href="#" data-h="${esc(r.q)}" data-k="${r.kind}" data-m="${r.market}">${esc(r.q)}</a></td><td>${r.market=='world'?'Worldwide':r.market}</td></tr>`).join('')+'</tbody>';
