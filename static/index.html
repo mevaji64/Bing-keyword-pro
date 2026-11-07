@@ -212,7 +212,7 @@ tbody tr:hover{background:#16203a}td.n,th.n{text-align:right}.tblwrap{max-height
     <h2>Add Bing Webmaster API key</h2>
     <div class="row"><input id="ac-name" placeholder="Naam, e.g. Meri News Sites" style="min-width:220px"><input id="ac-key" type="password" placeholder="API key paste karein" style="min-width:360px"><button class="btn" id="ac-add">Add & verify</button></div>
     <div id="ac-msg" class="small" style="margin-top:8px"></div>
-    <div class="note" style="margin-top:12px">Har Bing Webmaster account ki alag key jod sakte hain. Key ek baar judne ke baad tab tak save rahti hai jab tak aap khud Remove ya Replace na karein (aapke computer/server par <code>config.json</code> me). Site Audit aur URL Index me har site apne aap sahi key se chalti hai.<br>Key kahan milegi: bing.com/webmasters → Settings (gear) → API access → API Key → Generate.</div>
+    <div class="note" style="margin-top:12px">Har Bing Webmaster account ki alag key jod sakte hain. Key ek baar judne ke baad tab tak save rahti hai jab tak aap khud Remove ya Replace na karein (aapke isi browser me (localStorage). Doosre browser/device par dobara jodni hogi). Site Audit aur URL Index me har site apne aap sahi key se chalti hai.<br>Key kahan milegi: bing.com/webmasters → Settings (gear) → API access → API Key → Generate.</div>
   </div>
   <div class="card"><div class="row" style="justify-content:space-between"><h2>Connected API accounts</h2><button class="btn sec" id="ac-refresh">Refresh sites</button></div><div id="ac-list"></div></div>
 </section>
@@ -238,7 +238,15 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const fmt=n=>n==null?'—':Number(n).toLocaleString('en-US');
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let CFG={accounts:[]},SITES=[],MARKETS=[], DATA={ideas:[],questions:[],bulk:[],audit:[],index:[]}, AUDIT={};
-async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
+// API keys & settings live in this browser (localStorage) and stay until you remove them
+const LS={get:(k,d)=>{try{return JSON.parse(localStorage.getItem('bkp_'+k))??d}catch(e){return d}},set:(k,v)=>localStorage.setItem('bkp_'+k,JSON.stringify(v))};
+function clientState(){const c={accounts:LS.get('accounts',[]),active:LS.get('active',null),indexnow_keys:LS.get('indexnow',{})};const w=LS.get('world',null);if(w)c.world_markets=w;return c}
+const maskKey=k=>k.length>8?k.slice(0,4)+'…'+k.slice(-4):'…';
+function addHist(kind,q,market){const hs=LS.get('hist',[]);hs.unshift({kind,q,market,time:new Date().toISOString().slice(0,16).replace('T',' ')});LS.set('hist',hs.slice(0,100))}
+async function api(path,body){if(body)body={...body,_client:clientState()};
+  if(body&&path=='/api/overview')addHist('overview',body.keyword,body.market);
+  if(body&&path=='/api/ideas')addHist('ideas',body.keyword,body.market);
+  const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
   const j=await r.json().catch(()=>({error:'Server error'}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));return j}
 function busy(btn,on,label){if(on){btn.dataset.l=btn.innerHTML;btn.innerHTML='<span class="spin"></span> '+(label||'Working…');btn.disabled=true}else{btn.innerHTML=btn.dataset.l;btn.disabled=false}}
 function kdColor(k){return k<15?'#2ecc71':k<30?'#7bd36b':k<50?'#f1c40f':k<70?'#f39c12':k<85?'#e67e22':'#e74c3c'}
@@ -255,7 +263,9 @@ async function init(){
   MARKETS=await api('/api/markets');
   const opts='<option value="world">🌍 Worldwide (all major markets)</option>'+MARKETS.map(m=>`<option value="${m.country}|${m.language}">${m.name} (${m.country.toUpperCase()} · ${m.language})</option>`).join('');
   $$('select.mkt').forEach(s=>{s.innerHTML=opts;s.value=localStorage.mkt||'us|en-US';s.onchange=()=>localStorage.mkt=s.value});
-  const c=await api('/api/config');CFG=c;
+  const c=await api('/api/config');const cs=clientState();
+  c.accounts=cs.accounts.map(a=>({id:a.id,name:a.name,masked:maskKey(a.apikey),added:a.added||''}));c.has_key=c.accounts.length>0;
+  c.active=c.accounts.some(a=>a.id==cs.active)?cs.active:(c.accounts[0]||{}).id;c.indexnow_keys=cs.indexnow_keys;if(cs.world_markets)c.world_markets=cs.world_markets;CFG=c;
   $('#keyState').textContent=c.has_key?c.accounts.length+' API account(s)':'API key: not set';$('#keyState').style.color=c.has_key?'#5be39a':'#ff8a7a';
   $('#hdr-acc').innerHTML=c.accounts.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('')||'<option>—</option>';$('#hdr-acc').value=c.active||'';
   $('#st-inlist').innerHTML=Object.entries(c.indexnow_keys||{}).map(([h,k])=>`${esc(h)}: ${esc(k.slice(0,6))}…`).join(' · ');
@@ -422,28 +432,32 @@ $('#ix-indexnow').onclick=async()=>{const site=ixSite(),urls=chosenUrls();$('#ix
   const b=$('#ix-indexnow');busy(b,true,'Sending');try{const d=await api('/api/site/indexnow',{site,urls});$('#ix-ok').textContent=`✓ IndexNow: ${d.submitted} URLs bheje (HTTP ${d.status}).`}catch(e){$('#ix-err').textContent=e.message}finally{busy(b,false)}};
 
 // ---------- history
-async function loadHistory(){const h=await api('/api/history');$('#tbl-history').innerHTML='<thead><tr><th>Time</th><th>Type</th><th>Query</th><th>Market</th></tr></thead><tbody>'+h.map(r=>`<tr><td>${r.time}</td><td>${r.kind}</td><td><a href="#" data-h="${esc(r.q)}" data-k="${r.kind}" data-m="${r.market}">${esc(r.q)}</a></td><td>${r.market=='world'?'Worldwide':r.market}</td></tr>`).join('')+'</tbody>';
+async function loadHistory(){const h=LS.get('hist',[]);$('#tbl-history').innerHTML='<thead><tr><th>Time</th><th>Type</th><th>Query</th><th>Market</th></tr></thead><tbody>'+h.map(r=>`<tr><td>${r.time}</td><td>${r.kind}</td><td><a href="#" data-h="${esc(r.q)}" data-k="${r.kind}" data-m="${r.market}">${esc(r.q)}</a></td><td>${r.market=='world'?'Worldwide':r.market}</td></tr>`).join('')+'</tbody>';
   $$('#tbl-history a').forEach(a=>a.onclick=e=>{e.preventDefault();if(a.dataset.k=='bulk')return;const t=a.dataset.k=='ideas'?'id':'ov';$('#'+t+'-kw').value=a.dataset.h;$('#'+t+'-mkt').value=a.dataset.m;go(a.dataset.k=='ideas'?'ideas':'overview');$('#'+t+'-go').click()})}
 
 // ---------- settings
-$('#st-insave').onclick=async()=>{const site=$('#st-insite').value;if(!site)return;await api('/api/config',{indexnow_site:site,indexnow_key:$('#st-inkey').value});$('#st-inkey').value='';$('#st-insave').textContent='Saved ✓';init()};
-$('#hdr-acc').onchange=async()=>{await api('/api/accounts/active',{id:$('#hdr-acc').value})};
+$('#st-insave').onclick=async()=>{const site=$('#st-insite').value;if(!site)return;const host=new URL(site.match(/^https?:/)?site:'https://'+site).host;const m=LS.get('indexnow',{});const k=$('#st-inkey').value.trim();if(k)m[host]=k;else delete m[host];LS.set('indexnow',m);$('#st-inkey').value='';$('#st-insave').textContent='Saved ✓';init()};
+$('#hdr-acc').onchange=()=>LS.set('active',$('#hdr-acc').value);
+const accs=()=>LS.get('accounts',[]);
+function updAcc(id,f){LS.set('accounts',accs().map(a=>a.id==id?{...a,...f}:a))}
 function renderAccounts(){const box=$('#ac-list');if(!CFG.accounts.length){box.innerHTML='<div class="mut">Abhi koi API key nahi judi.</div>';return}
   box.innerHTML='<table><thead><tr><th>Name</th><th>API key</th><th>Sites</th><th>Added</th><th></th></tr></thead><tbody>'+CFG.accounts.map(a=>{const ss=SITES.filter(x=>x.account==a.id);
    return `<tr><td><b>${esc(a.name)}</b>${a.id==CFG.active?' <span class="badge b-low">default</span>':''}</td><td><code>${esc(a.masked)}</code></td><td>${ss.length?ss.map(x=>esc(x.url)).join('<br>'):'<span class="mut">—</span>'}</td><td>${esc(a.added||'')}</td>
    <td style="white-space:nowrap"><button class="btn sec" data-act="test" data-id="${a.id}">Test</button> <button class="btn sec" data-act="rename" data-id="${a.id}">Rename</button> <button class="btn sec" data-act="replace" data-id="${a.id}">Replace key</button> ${a.id!=CFG.active?`<button class="btn sec" data-act="default" data-id="${a.id}">Set default</button> `:''}<button class="btn" style="background:#a83232" data-act="remove" data-id="${a.id}">Remove</button></td></tr>`}).join('')+'</tbody></table>';
   box.querySelectorAll('button[data-act]').forEach(b=>b.onclick=async()=>{const id=b.dataset.id,act=b.dataset.act;$('#ac-msg').textContent='';
     try{if(act=='test'){busy(b,true,'');const d=await api('/api/test',{id});$('#ac-msg').innerHTML=`<span class="ok">✓ Key valid · ${d.sites.length} site(s)</span>`}
-      if(act=='rename'){const n=prompt('Naya naam:');if(!n)return;await api('/api/accounts/update',{id,name:n})}
-      if(act=='replace'){const k=prompt('Nayi API key paste karein:');if(!k)return;await api('/api/accounts/update',{id,apikey:k});$('#ac-msg').innerHTML='<span class="ok">✓ Key replace ho gayi.</span>'}
-      if(act=='default')await api('/api/accounts/active',{id});
-      if(act=='remove'){if(!confirm('Yeh API account hata dein?'))return;await api('/api/accounts/remove',{id})}
+      if(act=='rename'){const n=prompt('Naya naam:');if(!n)return;updAcc(id,{name:n.trim()})}
+      if(act=='replace'){const k=(prompt('Nayi API key paste karein:')||'').trim();if(!k)return;await api('/api/verify-key',{apikey:k});updAcc(id,{apikey:k});$('#ac-msg').innerHTML='<span class="ok">✓ Key replace ho gayi.</span>'}
+      if(act=='default')LS.set('active',id);
+      if(act=='remove'){if(!confirm('Yeh API account hata dein?'))return;LS.set('accounts',accs().filter(a=>a.id!=id));if(LS.get('active')==id)LS.set('active',(accs()[0]||{}).id||null)}
       if(act!='test'){await init();await loadSites(true)}}catch(e){$('#ac-msg').innerHTML=`<span style="color:#ff8a7a">✗ ${esc(e.message)}</span>`}finally{if(act=='test')busy(b,false)}})}
 $('#ac-add').onclick=async()=>{const b=$('#ac-add');const key=$('#ac-key').value.trim();if(!key)return;busy(b,true,'Verifying');$('#ac-msg').textContent='';
-  try{const d=await api('/api/accounts/add',{name:$('#ac-name').value,apikey:key});$('#ac-key').value='';$('#ac-name').value='';
+  try{if(accs().some(a=>a.apikey==key))throw new Error('Yeh API key pehle se judi hui hai.');
+    const d=await api('/api/verify-key',{apikey:key});const id='acc'+Date.now();
+    LS.set('accounts',[...accs(),{id,name:$('#ac-name').value.trim()||'Account '+(accs().length+1),apikey:key,added:new Date().toISOString().slice(0,10)}]);if(!LS.get('active'))LS.set('active',id);$('#ac-key').value='';$('#ac-name').value='';
     $('#ac-msg').innerHTML=`<span class="ok">✓ Key jud gayi aur save ho gayi. ${d.sites.length} site(s) mili.</span>`;await init();await loadSites(true)}catch(e){$('#ac-msg').innerHTML=`<span style="color:#ff8a7a">✗ ${esc(e.message)}</span>`}finally{busy(b,false)}};
 $('#ac-refresh').onclick=async()=>{const b=$('#ac-refresh');busy(b,true,'');try{const d=await loadSites(true);if(d.errors.length)$('#ac-msg').textContent=d.errors.join(' | ')}finally{busy(b,false)}};
-$('#st-wsave').onclick=async()=>{const w=$$('#st-world input:checked').map(i=>i.value);if(!w.length)return;await api('/api/config',{world_markets:w});$('#st-wsave').textContent='Saved ✓ ('+w.length+')'};
+$('#st-wsave').onclick=async()=>{const w=$$('#st-world input:checked').map(i=>i.value);if(!w.length)return;LS.set('world',w);$('#st-wsave').textContent='Saved ✓ ('+w.length+')'};
 $('#st-clear').onclick=async()=>{await api('/api/clear-cache',{});$('#st-clear').textContent='Cache cleared ✓'};
 </script>
 </body>

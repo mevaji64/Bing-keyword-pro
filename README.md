@@ -54,10 +54,17 @@ Markets: 48 country-language markets plus **Worldwide** (sum of the markets you 
 
 ## Security
 
-- API keys are stored only in `config.json` next to the app (or in `BKP_DATA_DIR`). It is in `.gitignore`, **never commit it**.
+- API keys are saved **in your own browser** (localStorage) and sent to the server only with each request. The server never writes them to disk, so they stay until you click Remove, even when a free host restarts. On a new browser/device add them once again.
+- `config.json` (old local mode) is in `.gitignore`, **never commit it**.
 - By default the server listens only on `127.0.0.1` (your own computer).
 
-## Hosting online (optional)
+## Hosting online (free on Render)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/mevaji64/Bing-keyword-pro)
+
+`render.yaml` deploys the Docker image on Render's free plan. Free services sleep after 15 minutes idle and take about a minute to wake.
+
+## Hosting with Docker (any host)
 
 Docker (Render, Railway, a VPS, etc.):
 

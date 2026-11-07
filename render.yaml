@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: bing-keyword-pro
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /
+    envVars:
+      - key: BKP_HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: "10000"

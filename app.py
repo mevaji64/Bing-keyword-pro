@@ -11,7 +11,27 @@ import urllib.request, urllib.parse, urllib.error
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor as _TPE
+import threading, hashlib
+
+# Per-request settings sent by the browser (keys are stored in the user's browser, not on the server)
+REQ = threading.local()
+
+class ThreadPoolExecutor(_TPE):
+    """Thread pool that carries the current request's browser settings into worker threads."""
+    def _wrap(self, fn):
+        ov = getattr(REQ, "ov", None)
+        def run(*a, **k):
+            REQ.ov = ov
+            try:
+                return fn(*a, **k)
+            finally:
+                REQ.ov = None
+        return run
+    def submit(self, fn, *a, **k):
+        return super().submit(self._wrap(fn), *a, **k)
+    def map(self, fn, *its, **k):
+        return super().map(self._wrap(fn), *its, **k)
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(APP_DIR, "static")
@@ -74,6 +94,12 @@ def load_config():
         cfg["accounts"].append({"id": "acc1", "name": "Main account", "apikey": cfg["apikey"]})
         cfg["active"] = "acc1"
     cfg.pop("apikey", None)
+    ov = getattr(REQ, "ov", None)
+    if isinstance(ov, dict):
+        for k in ("accounts", "active", "world_markets", "indexnow_keys"):
+            if ov.get(k) is not None:
+                cfg[k] = ov[k]
+        cfg["accounts"] = [a for a in cfg["accounts"] if isinstance(a, dict) and a.get("apikey")]
     if cfg["accounts"] and not any(a["id"] == cfg["active"] for a in cfg["accounts"]):
         cfg["active"] = cfg["accounts"][0]["id"]
     return cfg
@@ -146,7 +172,7 @@ def bing_api(method, params=None, post=None, ttl=CACHE_TTL, use_cache=True, acco
     if not key:
         raise BingError("API key missing. 'API Accounts' tab me Bing Webmaster API key jodein.")
     params = dict(params or {})
-    ck = "api:" + method + ":" + (acc["id"] + ":" if (account and acc) else "") + json.dumps(params, sort_keys=True)
+    ck = "api:" + method + ":" + (hashlib.sha256(key.encode()).hexdigest()[:16] + ":" if (account or apikey) else "") + json.dumps(params, sort_keys=True)
     if use_cache and post is None:
         c = cache_get(ck, ttl)
         if c is not None:
@@ -714,7 +740,8 @@ class Handler(BaseHTTPRequestHandler):
         if p.path == "/api/history":
             con = db()
             try:
-                rows = con.execute("SELECT kind,q,market,t FROM history ORDER BY id DESC LIMIT 100").fetchall()
+                rows = [] if os.environ.get("BKP_HOST", "127.0.0.1") != "127.0.0.1" else \
+                    con.execute("SELECT kind,q,market,t FROM history ORDER BY id DESC LIMIT 100").fetchall()
             finally:
                 con.close()
             return self._send(200, [{"kind": r[0], "q": r[1], "market": r[2],
@@ -730,6 +757,13 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(self.rfile.read(n).decode("utf-8") or "{}")
         except Exception:
             return self._send(400, {"error": "bad json"})
+        REQ.ov = data.pop("_client", None)
+        try:
+            return self._post(p, data)
+        finally:
+            REQ.ov = None
+
+    def _post(self, p, data):
         try:
             if p == "/api/config":
                 c = load_config()
@@ -743,6 +777,12 @@ class Handler(BaseHTTPRequestHandler):
                         c["indexnow_keys"].pop(h, None)
                 save_config(c)
                 return self._send(200, {"ok": True})
+            if p == "/api/verify-key":
+                key = (data.get("apikey") or "").strip()
+                if len(key) < 16:
+                    raise BingError("API key sahi nahi lag rahi.")
+                sites = bing_api("GetUserSites", apikey=key, use_cache=False) or []
+                return self._send(200, {"ok": True, "sites": [x.get("Url") for x in sites]})
             if p == "/api/accounts/add":
                 key = (data.get("apikey") or "").strip()
                 name = (data.get("name") or "").strip() or "Account"
