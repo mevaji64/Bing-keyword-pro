@@ -1,0 +1,7 @@
+# Never commit your API keys or cache
+config.json
+cache.db
+data/
+__pycache__/
+*.pyc
+.env

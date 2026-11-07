@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bing Keyword Pro</title>
+<style>
+:root{--bg:#0b1020;--panel:#121a30;--panel2:#18223d;--line:#24304f;--txt:#e6ebf5;--mut:#8d9abb;--acc:#2f81f7;--acc2:#00b4a6;--ok:#2ecc71;--warn:#f1c40f;--bad:#e74c3c;--org:#e67e22}
+*{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+header{display:flex;align-items:center;gap:14px;padding:12px 22px;background:linear-gradient(90deg,#0f1a36,#122550);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.logo{font-weight:800;font-size:19px;letter-spacing:.3px}.logo b{color:#4aa3ff}.pill{font-size:11px;padding:3px 8px;border-radius:20px;background:#1d2b4f;color:var(--mut)}
+nav{display:flex;gap:4px;flex-wrap:wrap;margin-left:18px}nav button{background:none;border:0;color:var(--mut);padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13.5px}
+nav button.on,nav button:hover{background:#1c2a4d;color:#fff}
+main{padding:20px 22px;max-width:1500px;margin:auto}.tab{display:none}.tab.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input,select,textarea{background:#0e1529;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:14px}
+textarea{width:100%;min-height:120px;font-family:inherit}input.big{flex:1;min-width:260px;font-size:15px}
+button.btn{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:9px 16px;cursor:pointer;font-weight:600}
+button.btn.sec{background:#22305a}button.btn.green{background:var(--acc2)}button.btn:disabled{opacity:.5;cursor:wait}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpi{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px}.kpi .l{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+.kpi .v{font-size:26px;font-weight:700;margin-top:6px}.kpi .s{font-size:12px;color:var(--mut);margin-top:4px}
+.kdbar{height:8px;border-radius:5px;background:#1d2747;margin-top:8px;overflow:hidden}.kdbar i{display:block;height:100%}
+table{width:100%;border-collapse:collapse;font-size:13.5px}th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--mut);font-weight:600;cursor:pointer;white-space:nowrap;position:sticky;top:0;background:var(--panel)}th:hover{color:#fff}
+tbody tr:hover{background:#16203a}td.n,th.n{text-align:right}.tblwrap{max-height:620px;overflow:auto;border-radius:8px}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11.5px;font-weight:600}
+.b-low{background:#163d2c;color:#5be39a}.b-med{background:#3d3616;color:#f5d76e}.b-high{background:#3d1a16;color:#ff8a7a}
+.i-Informational{background:#173057;color:#7fb5ff}.i-Commercial{background:#3a2a52;color:#c7a2ff}.i-Transactional{background:#164035;color:#5fe0bd}.i-Navigational{background:#3d2f16;color:#ffc56b}
+.kdc{display:inline-block;min-width:34px;text-align:center;padding:2px 6px;border-radius:6px;font-weight:700;color:#0b1020}
+.mut{color:var(--mut)}.err{color:#ff8a7a;margin:8px 0}.ok{color:#5be39a}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.filters input,.filters select{padding:7px 9px;font-size:13px}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid #fff4;border-top-color:#fff;border-radius:50%;animation:s 0.8s linear infinite;vertical-align:middle}
+@keyframes s{to{transform:rotate(360deg)}}h2{margin:0 0 12px;font-size:17px}h3{margin:6px 0 10px;font-size:15px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.small{font-size:12px}a{color:#6fb1ff}svg text{fill:var(--mut);font-size:10px}.sub{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.sub button{background:#18223d;border:1px solid var(--line);color:var(--mut);padding:7px 12px;border-radius:8px;cursor:pointer}.sub button.on{color:#fff;border-color:var(--acc)}
+.note{background:#132447;border-left:3px solid var(--acc);padding:10px 12px;border-radius:6px;color:#c6d4f0;font-size:13px}
+.chk{display:flex;gap:6px;align-items:center;color:var(--mut)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Bing <b>Keyword</b> Pro</div><span class="pill" id="keyState">API: …</span><select id="hdr-acc" title="Keyword research ke liye API account" style="padding:5px 8px;font-size:12.5px"></select>
+  <nav id="nav">
+    <button data-t="overview" class="on">Keyword Overview</button>
+    <button data-t="ideas">Keyword Ideas</button>
+    <button data-t="questions">Questions</button>
+    <button data-t="bulk">Bulk Analyzer</button>
+    <button data-t="audit">Site Audit</button>
+    <button data-t="index">URL Index</button>
+    <button data-t="history">History</button>
+    <button data-t="accounts">API Accounts</button>
+    <button data-t="settings">Settings</button>
+  </nav>
+</header>
+<main>
+
+<!-- ============ OVERVIEW ============ -->
+<section class="tab on" id="t-overview">
+  <div class="card">
+    <div class="row">
+      <input class="big" id="ov-kw" placeholder="Keyword daalein, e.g. best running shoes">
+      <select class="mkt" id="ov-mkt"></select>
+      <select id="ov-months"><option value="1">Last 30 days</option><option value="3">Last 3 months (avg)</option><option value="6">Last 6 months (avg)</option></select>
+      <button class="btn" id="ov-go">Analyze</button>
+    </div>
+    <div id="ov-err" class="err"></div>
+  </div>
+  <div id="ov-out" style="display:none">
+    <div class="card">
+      <h2 id="ov-title"></h2>
+      <div class="kpis">
+        <div class="kpi"><div class="l">Search volume / month</div><div class="v" id="k-vol"></div><div class="s">Exact match, Bing</div></div>
+        <div class="kpi"><div class="l">Broad volume / month</div><div class="v" id="k-broad"></div><div class="s">Searches containing the term</div></div>
+        <div class="kpi"><div class="l">Keyword Difficulty</div><div class="v" id="k-kd"></div><div class="kdbar"><i id="k-kdbar"></i></div><div class="s" id="k-kdl"></div></div>
+        <div class="kpi"><div class="l">Competition</div><div class="v" id="k-comp"></div><div class="s" id="k-compi"></div></div>
+        <div class="kpi"><div class="l">Search intent</div><div class="v" style="font-size:18px" id="k-int"></div><div class="s" id="k-words"></div></div>
+        <div class="kpi"><div class="l">Trend (last 4 wks)</div><div class="v" id="k-trend"></div><div class="s">vs previous 4 weeks</div></div>
+        <div class="kpi"><div class="l">Opportunity</div><div class="v" id="k-opp"></div><div class="s">Volume vs difficulty (0-100)</div></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h3>Weekly search trend (Bing)</h3><div id="ov-chart"></div></div>
+      <div class="card"><h3>Volume by country</h3><div class="tblwrap" style="max-height:330px"><table id="ov-ctry"></table></div></div>
+    </div>
+    <div class="row"><button class="btn sec" id="ov-toideas">Find keyword ideas for this →</button></div>
+  </div>
+</section>
+
+<!-- ============ IDEAS ============ -->
+<section class="tab" id="t-ideas">
+  <div class="card">
+    <div class="row">
+      <input class="big" id="id-kw" placeholder="Seed keyword">
+      <select class="mkt" id="id-mkt"></select>
+      <select id="id-months"><option value="1">30 days</option><option value="3">3 months avg</option><option value="6">6 months avg</option></select>
+      <select id="id-limit"><option>50</option><option selected>100</option><option>200</option><option>300</option><option>500</option></select>
+      <label class="chk"><input type="checkbox" id="id-deep" checked> Deep (A-Z + questions)</label>
+      <button class="btn" id="id-go">Get ideas</button>
+    </div>
+    <div class="small mut" style="margin-top:8px">Sources: Bing Webmaster related keywords + Bing autosuggest. Har idea ka volume Bing API se aata hai. Bade limit / Worldwide me 1-3 minute lag sakte hain.</div>
+    <div id="id-err" class="err"></div>
+  </div>
+  <div class="card" id="id-out" style="display:none">
+    <div class="row" style="justify-content:space-between"><h2 id="id-title"></h2>
+      <div class="row"><button class="btn sec" data-copy="ideas">Copy keywords</button><button class="btn green" data-csv="ideas">Export CSV</button></div></div>
+    <div class="filters" data-for="ideas"></div>
+    <div class="tblwrap"><table id="tbl-ideas"></table></div>
+  </div>
+</section>
+
+<!-- ============ QUESTIONS ============ -->
+<section class="tab" id="t-questions">
+  <div class="card">
+    <div class="note">Questions tab "Keyword Ideas" ke results me se sawaal wale keywords (what, how, why, kya, kaise…) dikhata hai. Pehle Keyword Ideas chalaein.</div>
+  </div>
+  <div class="card" id="q-out">
+    <div class="row" style="justify-content:space-between"><h2 id="q-title">Questions</h2><button class="btn green" data-csv="questions">Export CSV</button></div>
+    <div class="tblwrap"><table id="tbl-questions"></table></div>
+  </div>
+</section>
+
+<!-- ============ BULK ============ -->
+<section class="tab" id="t-bulk">
+  <div class="card">
+    <h2>Bulk keyword analyzer</h2>
+    <textarea id="bk-list" placeholder="Ek line me ek keyword (max 1000)"></textarea>
+    <div class="row" style="margin-top:10px">
+      <select class="mkt" id="bk-mkt"></select>
+      <select id="bk-months"><option value="1">30 days</option><option value="3">3 months avg</option><option value="6">6 months avg</option></select>
+      <button class="btn" id="bk-go">Analyze all</button><span class="mut small" id="bk-count"></span>
+    </div>
+    <div id="bk-err" class="err"></div>
+  </div>
+  <div class="card" id="bk-out" style="display:none">
+    <div class="row" style="justify-content:space-between"><h2>Results</h2><button class="btn green" data-csv="bulk">Export CSV</button></div>
+    <div class="filters" data-for="bulk"></div>
+    <div class="tblwrap"><table id="tbl-bulk"></table></div>
+  </div>
+</section>
+
+<!-- ============ SITE AUDIT ============ -->
+<section class="tab" id="t-audit">
+  <div class="card">
+    <div class="row">
+      <select id="au-site" style="min-width:320px"><option value="">— Load your Bing Webmaster sites —</option></select>
+      <button class="btn sec" id="au-load">Load sites</button>
+      <input id="au-site-manual" placeholder="ya site URL likhein: https://example.com/" style="min-width:280px">
+      <button class="btn" id="au-go">Run audit</button>
+    </div>
+    <div class="small mut" style="margin-top:8px">Site Bing Webmaster Tools me verified honi chahiye (usi account ki API key). Data: last ~6 months, Bing ki taraf se weekly.</div>
+    <div id="au-err" class="err"></div>
+  </div>
+  <div id="au-out" style="display:none">
+    <div class="card">
+      <h2 id="au-title"></h2>
+      <div class="kpis">
+        <div class="kpi"><div class="l">Ranking keywords</div><div class="v" id="a-kws"></div><div class="s" id="a-top"></div></div>
+        <div class="kpi"><div class="l">Impressions</div><div class="v" id="a-imp"></div><div class="s">Last ~6 months</div></div>
+        <div class="kpi"><div class="l">Clicks</div><div class="v" id="a-clk"></div><div class="s" id="a-ctr"></div></div>
+        <div class="kpi"><div class="l">Avg position</div><div class="v" id="a-pos"></div><div class="s">Impression-weighted</div></div>
+        <div class="kpi"><div class="l">Pages in Bing index</div><div class="v" id="a-idx"></div><div class="s" id="a-crawl"></div></div>
+        <div class="kpi"><div class="l">URL submit quota</div><div class="v" id="a-quota"></div><div class="s">Daily / monthly</div></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h3>Clicks & impressions (daily)</h3><div id="au-chart"></div></div>
+      <div class="card"><h3>Position distribution</h3><div id="au-dist"></div></div>
+    </div>
+    <div class="card">
+      <div class="sub" id="au-sub"><button data-s="kw" class="on">Ranking keywords</button><button data-s="pages">Top pages</button><button data-s="striking">Striking distance (pos 4-20)</button><button data-s="issues">Crawl issues</button></div>
+      <div class="row" style="justify-content:space-between"><div class="filters" data-for="audit"></div><button class="btn green" data-csv="audit">Export CSV</button></div>
+      <div class="tblwrap"><table id="tbl-audit"></table></div>
+      <div id="au-qp" style="display:none;margin-top:14px"><h3 id="au-qp-t"></h3><table id="tbl-qp"></table></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ URL INDEX ============ -->
+<section class="tab" id="t-index">
+  <div class="card">
+    <h2>URL index checker & submitter</h2>
+    <div class="row"><select id="ix-site" style="min-width:320px"><option value="">— Site chunein (Site Audit me "Load sites") —</option></select>
+      <input id="ix-site-manual" placeholder="ya site URL: https://example.com/" style="min-width:280px"></div>
+    <div class="row" style="margin-top:10px"><input class="big" id="ix-sitemap" placeholder="Sitemap URL (optional) e.g. https://example.com/sitemap.xml">
+      <select id="ix-cap"><option value="100">max 100 URLs</option><option value="300">max 300</option><option value="500" selected>max 500</option><option value="1000">max 1000</option><option value="2000">max 2000</option></select></div>
+    <div style="margin-top:10px"><textarea id="ix-urls" placeholder="Ya URLs yahan paste karein (ek line me ek)"></textarea></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="ix-check">Check index status</button>
+      <button class="btn green" id="ix-submit">Submit to Bing (Webmaster)</button>
+      <button class="btn sec" id="ix-indexnow">Submit via IndexNow</button>
+      <span class="mut small" id="ix-quota"></span>
+    </div>
+    <div id="ix-err" class="err"></div><div id="ix-ok" class="ok"></div>
+  </div>
+  <div class="card" id="ix-out" style="display:none">
+    <div class="row" style="justify-content:space-between"><h2 id="ix-title"></h2>
+      <div class="row"><button class="btn sec" id="ix-sel-not">Select not-indexed</button><button class="btn green" data-csv="index">Export CSV</button></div></div>
+    <div class="filters" data-for="index"></div>
+    <div class="tblwrap"><table id="tbl-index"></table></div>
+  </div>
+</section>
+
+<!-- ============ HISTORY ============ -->
+<section class="tab" id="t-history"><div class="card"><h2>Recent searches</h2><table id="tbl-history"></table></div></section>
+
+<!-- ============ SETTINGS ============ -->
+<section class="tab" id="t-accounts">
+  <div class="card">
+    <h2>Add Bing Webmaster API key</h2>
+    <div class="row"><input id="ac-name" placeholder="Naam, e.g. Meri News Sites" style="min-width:220px"><input id="ac-key" type="password" placeholder="API key paste karein" style="min-width:360px"><button class="btn" id="ac-add">Add & verify</button></div>
+    <div id="ac-msg" class="small" style="margin-top:8px"></div>
+    <div class="note" style="margin-top:12px">Har Bing Webmaster account ki alag key jod sakte hain. Key ek baar judne ke baad tab tak save rahti hai jab tak aap khud Remove ya Replace na karein (aapke computer/server par <code>config.json</code> me). Site Audit aur URL Index me har site apne aap sahi key se chalti hai.<br>Key kahan milegi: bing.com/webmasters → Settings (gear) → API access → API Key → Generate.</div>
+  </div>
+  <div class="card"><div class="row" style="justify-content:space-between"><h2>Connected API accounts</h2><button class="btn sec" id="ac-refresh">Refresh sites</button></div><div id="ac-list"></div></div>
+</section>
+
+<section class="tab" id="t-settings">
+  <div class="card">
+    <h2>IndexNow keys (optional, har site ki alag)</h2>
+    <div class="row"><select id="st-insite" style="min-width:300px"></select><input id="st-inkey" placeholder="IndexNow key (8-128 chars)" style="min-width:300px"><button class="btn" id="st-insave">Save</button></div>
+    <div id="st-inlist" class="small mut" style="margin-top:6px"></div>
+    <div class="small mut" style="margin-top:6px">Isi naam ki file <code>&lt;key&gt;.txt</code> (andar sirf key) apni site ke root par upload karein, jaise https://example.com/&lt;key&gt;.txt</div>
+  </div>
+  <div class="card">
+    <h2>Worldwide markets</h2>
+    <div class="small mut">"Worldwide" chunne par in markets ka volume jod kar dikhaya jaata hai. Zyada markets = zyada API calls.</div>
+    <div id="st-world" style="columns:3;margin-top:10px"></div>
+    <div class="row" style="margin-top:10px"><button class="btn" id="st-wsave">Save markets</button><button class="btn sec" id="st-clear">Clear cache</button></div>
+  </div>
+</section>
+</main>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const fmt=n=>n==null?'—':Number(n).toLocaleString('en-US');
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let CFG={accounts:[]},SITES=[],MARKETS=[], DATA={ideas:[],questions:[],bulk:[],audit:[],index:[]}, AUDIT={};
+async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
+  const j=await r.json().catch(()=>({error:'Server error'}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));return j}
+function busy(btn,on,label){if(on){btn.dataset.l=btn.innerHTML;btn.innerHTML='<span class="spin"></span> '+(label||'Working…');btn.disabled=true}else{btn.innerHTML=btn.dataset.l;btn.disabled=false}}
+function kdColor(k){return k<15?'#2ecc71':k<30?'#7bd36b':k<50?'#f1c40f':k<70?'#f39c12':k<85?'#e67e22':'#e74c3c'}
+function compBadge(c){return `<span class="badge ${c=='Low'?'b-low':c=='Medium'?'b-med':'b-high'}">${c}</span>`}
+function posColor(p){return p==null?'':p<=3?'#2ecc71':p<=10?'#7bd36b':p<=20?'#f1c40f':'#e67e22'}
+
+// ---------- nav
+$$('#nav button').forEach(b=>b.onclick=()=>{$$('#nav button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  $$('.tab').forEach(t=>t.classList.remove('on'));$('#t-'+b.dataset.t).classList.add('on');if(b.dataset.t=='history')loadHistory()});
+function go(t){$(`#nav button[data-t="${t}"]`).click()}
+
+// ---------- init
+async function init(){
+  MARKETS=await api('/api/markets');
+  const opts='<option value="world">🌍 Worldwide (all major markets)</option>'+MARKETS.map(m=>`<option value="${m.country}|${m.language}">${m.name} (${m.country.toUpperCase()} · ${m.language})</option>`).join('');
+  $$('select.mkt').forEach(s=>{s.innerHTML=opts;s.value=localStorage.mkt||'us|en-US';s.onchange=()=>localStorage.mkt=s.value});
+  const c=await api('/api/config');CFG=c;
+  $('#keyState').textContent=c.has_key?c.accounts.length+' API account(s)':'API key: not set';$('#keyState').style.color=c.has_key?'#5be39a':'#ff8a7a';
+  $('#hdr-acc').innerHTML=c.accounts.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('')||'<option>—</option>';$('#hdr-acc').value=c.active||'';
+  $('#st-inlist').innerHTML=Object.entries(c.indexnow_keys||{}).map(([h,k])=>`${esc(h)}: ${esc(k.slice(0,6))}…`).join(' · ');
+  renderAccounts();if(c.has_key)loadSites();
+  $('#st-world').innerHTML=MARKETS.map(m=>{const v=m.country+'|'+m.language;return `<label class="chk"><input type="checkbox" value="${v}" ${c.world_markets.includes(v)?'checked':''}> ${m.name}</label>`}).join('');
+  if(!c.has_key)go('accounts');
+}
+init();
+
+// ---------- generic table
+const COLS={
+ kw:[['keyword','Keyword'],['volume','Volume','n'],['broad','Broad vol.','n'],['kd','KD %','n'],['competition','Competition'],['intent','Intent'],['opportunity','Opportunity','n'],['words','Words','n'],['source','Source']],
+ audit_kw:[['query','Keyword'],['latest_position','Position (latest)','n'],['avg_position','Avg pos.','n'],['position_change','Change','n'],['impressions','Impressions','n'],['clicks','Clicks','n'],['ctr','CTR %','n'],['intent','Intent'],['last_date','Last seen']],
+ audit_pages:[['url','Page URL'],['avg_position','Avg pos.','n'],['impressions','Impressions','n'],['clicks','Clicks','n'],['ctr','CTR %','n']],
+ audit_issues:[['url','URL'],['issues','Issue'],['http_code','HTTP','n'],['in_links','Inlinks','n']],
+ index:[['sel',''],['url','URL'],['status','Index status'],['http','HTTP','n'],['last_crawled','Last crawled'],['discovered','Discovered'],['imp','Impressions','n'],['clk','Clicks','n']],
+};
+const SORT={};
+function cell(k,r){const v=r[k];
+  if(k=='kd')return `<span class="kdc" style="background:${kdColor(v)}" title="${r.kd_label}">${v}</span>`;
+  if(k=='competition')return compBadge(v);
+  if(k=='intent')return `<span class="badge i-${v}">${v}</span>`;
+  if(k=='keyword'||k=='query')return `<a href="#" data-kw="${esc(v)}">${esc(v)}</a>`;
+  if(k=='url')return `<a href="${esc(v)}" target="_blank">${esc(v)}</a>`;
+  if(k=='latest_position'||k=='avg_position')return v==null?'—':`<b style="color:${posColor(v)}">${v}</b>`;
+  if(k=='position_change')return v==null||v==0?'<span class="mut">0</span>':v>0?`<span class="ok">▲ ${v}</span>`:`<span style="color:#ff8a7a">▼ ${Math.abs(v)}</span>`;
+  if(k=='status')return `<span class="badge ${r.indexed?'b-low':r.status.startsWith('Not')?'b-high':'b-med'}" title="${esc(r.detail)}">${esc(v)}</span>`;
+  if(k=='sel')return `<input type="checkbox" class="ixsel" value="${esc(r.url)}">`;
+  if(k=='imp')return fmt(r.traffic?.impressions);if(k=='clk')return fmt(r.traffic?.clicks);
+  return typeof v=='number'?fmt(v):esc(v??'—')}
+function render(id,cols,rows){const t=$('#tbl-'+id);const s=SORT[id];
+  if(s)rows=[...rows].sort((a,b)=>{let x=a[s.k],y=b[s.k];if(x==null)return 1;if(y==null)return -1;return (typeof x=='number'?x-y:String(x).localeCompare(y))*s.d});
+  t.innerHTML='<thead><tr>'+cols.map(c=>`<th class="${c[2]||''}" data-k="${c[0]}">${c[1]}${s&&s.k==c[0]?(s.d>0?' ▲':' ▼'):''}</th>`).join('')+'</tr></thead><tbody>'+
+   rows.map(r=>'<tr>'+cols.map(c=>`<td class="${c[2]||''}">${cell(c[0],r)}</td>`).join('')+'</tr>').join('')+'</tbody>';
+  t.querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k=='sel')return;SORT[id]={k,d:SORT[id]&&SORT[id].k==k?-SORT[id].d:(typeof rows[0]?.[k]=='number'?-1:1)};refresh(id)});
+  t.querySelectorAll('a[data-kw]').forEach(a=>a.onclick=e=>{e.preventDefault();$('#ov-kw').value=a.dataset.kw;go('overview');$('#ov-go').click()});
+  if(id=='audit'&&AUDIT.view=='kw'||id=='audit'&&AUDIT.view=='striking')t.querySelectorAll('a[data-kw]').forEach(a=>a.onclick=e=>{e.preventDefault();queryPages(a.dataset.kw)});
+}
+// filters
+const FILT={};
+function buildFilters(id,type){const box=$(`.filters[data-for="${id}"]`);if(!box)return;
+  if(type=='kw')box.innerHTML=`<input placeholder="Include words" data-f="inc"><input placeholder="Exclude words" data-f="exc"><input type="number" placeholder="Min vol" data-f="minv" style="width:95px"><input type="number" placeholder="Max vol" data-f="maxv" style="width:95px"><input type="number" placeholder="KD min" data-f="kdmin" style="width:80px"><input type="number" placeholder="KD max" data-f="kdmax" style="width:80px"><select data-f="intent"><option value="">All intents</option><option>Informational</option><option>Commercial</option><option>Transactional</option><option>Navigational</option></select><select data-f="comp"><option value="">All competition</option><option>Low</option><option>Medium</option><option>High</option></select><label class="chk"><input type="checkbox" data-f="hidezero"> Hide 0 volume</label><span class="mut small" data-f="count"></span>`;
+  else if(type=='audit')box.innerHTML=`<input placeholder="Search" data-f="inc"><input type="number" placeholder="Pos min" data-f="pmin" style="width:85px"><input type="number" placeholder="Pos max" data-f="pmax" style="width:85px"><input type="number" placeholder="Min impr." data-f="minv" style="width:95px"><span class="mut small" data-f="count"></span>`;
+  else if(type=='index')box.innerHTML=`<input placeholder="Search URL" data-f="inc"><select data-f="st"><option value="">All statuses</option><option value="1">Indexed</option><option value="0">Not indexed</option></select><span class="mut small" data-f="count"></span>`;
+  box.querySelectorAll('input,select').forEach(i=>i.oninput=()=>refresh(id));}
+function applyFilters(id,rows){const box=$(`.filters[data-for="${id}"]`);if(!box)return rows;const g=f=>{const e=box.querySelector(`[data-f="${f}"]`);return e?(e.type=='checkbox'?e.checked:e.value.trim()):''};
+  const inc=g('inc').toLowerCase(),exc=g('exc').toLowerCase();
+  rows=rows.filter(r=>{const name=(r.keyword||r.query||r.url||'').toLowerCase();
+    if(inc&&!inc.split(/[, ]+/).every(w=>name.includes(w)))return false;
+    if(exc&&exc.split(/[, ]+/).some(w=>w&&name.includes(w)))return false;
+    const vol=r.volume??r.impressions;
+    if(g('minv')!==''&&vol<+g('minv'))return false;if(g('maxv')!==''&&vol>+g('maxv'))return false;
+    if(g('kdmin')!==''&&r.kd<+g('kdmin'))return false;if(g('kdmax')!==''&&r.kd>+g('kdmax'))return false;
+    if(g('intent')&&r.intent!=g('intent'))return false;if(g('comp')&&r.competition!=g('comp'))return false;
+    if(g('hidezero')&&!r.volume)return false;
+    const p=r.latest_position??r.avg_position;if(g('pmin')!==''&&(p==null||p<+g('pmin')))return false;if(g('pmax')!==''&&(p==null||p>+g('pmax')))return false;
+    if(g('st')!==''&&String(+!!r.indexed)!=g('st'))return false;return true});
+  const c=box.querySelector('[data-f="count"]');if(c)c.textContent=rows.length+' rows';return rows}
+function refresh(id){let cols=COLS.kw;if(id=='audit')cols=AUDIT.view=='pages'?COLS.audit_pages:AUDIT.view=='issues'?COLS.audit_issues:COLS.audit_kw;if(id=='index')cols=COLS.index;
+  render(id,cols,applyFilters(id,DATA[id]))}
+// csv / copy
+$$('[data-csv]').forEach(b=>b.onclick=()=>{const id=b.dataset.csv;const rows=applyFilters(id,DATA[id]);if(!rows.length)return;
+  let keys=Object.keys(rows[0]).filter(k=>typeof rows[0][k]!='object'||rows[0][k]==null);
+  const csv=[keys.join(',')].concat(rows.map(r=>keys.map(k=>`"${String(r[k]??'').replace(/"/g,'""')}"`).join(','))).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download=`bing-${id}-${new Date().toISOString().slice(0,10)}.csv`;a.click()});
+$$('[data-copy]').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(applyFilters(b.dataset.copy,DATA[b.dataset.copy]).map(r=>r.keyword).join('\n'));b.textContent='Copied ✓';setTimeout(()=>b.textContent='Copy keywords',1500)});
+
+// ---------- charts (SVG)
+function lineChart(el,series,labels,colors){const W=640,H=240,P=36;const all=series.flat();const mx=Math.max(1,...all);const n=labels.length;
+  if(!n){el.innerHTML='<div class="mut">Bing ne is keyword/market ke liye trend data nahi diya.</div>';return}
+  const x=i=>P+(n==1?0:(W-P-10)*i/(n-1)),y=v=>H-24-(H-40)*v/mx;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;for(let g=0;g<=4;g++){const v=mx*g/4;s+=`<line x1="${P}" x2="${W-10}" y1="${y(v)}" y2="${y(v)}" stroke="#24304f"/><text x="2" y="${y(v)+3}">${v>=1000?(v/1000).toFixed(1)+'k':Math.round(v)}</text>`}
+  series.forEach((ser,si)=>{s+=`<polyline fill="none" stroke="${colors[si]}" stroke-width="2.2" points="${ser.map((v,i)=>x(i)+','+y(v)).join(' ')}"/>`;
+    ser.forEach((v,i)=>s+=`<circle cx="${x(i)}" cy="${y(v)}" r="2.5" fill="${colors[si]}"><title>${labels[i]}: ${fmt(v)}</title></circle>`)});
+  const step=Math.ceil(n/8);labels.forEach((l,i)=>{if(i%step==0)s+=`<text x="${x(i)-18}" y="${H-6}">${(l||'').slice(5)}</text>`});el.innerHTML=s+'</svg>'}
+function barChart(el,items){const W=640,H=220,P=30,mx=Math.max(1,...items.map(i=>i[1]));const bw=(W-P)/items.length;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;items.forEach((it,i)=>{const h=(H-40)*it[1]/mx;s+=`<rect x="${P+i*bw+8}" y="${H-24-h}" width="${bw-16}" height="${h}" rx="4" fill="${it[2]}"><title>${it[0]}: ${it[1]}</title></rect><text x="${P+i*bw+bw/2-14}" y="${H-8}">${it[0]}</text><text x="${P+i*bw+bw/2-8}" y="${H-28-h}" style="fill:#e6ebf5">${it[1]}</text>`});el.innerHTML=s+'</svg>'}
+
+// ---------- overview
+$('#ov-kw').onkeydown=e=>{if(e.key=='Enter')$('#ov-go').click()};
+$('#ov-go').onclick=async()=>{const kw=$('#ov-kw').value.trim();if(!kw)return;const b=$('#ov-go');$('#ov-err').textContent='';busy(b,true,'Analyzing');
+  try{const d=await api('/api/overview',{keyword:kw,market:$('#ov-mkt').value,months:$('#ov-months').value});const m=d.metrics;
+    $('#ov-out').style.display='';$('#ov-title').innerHTML=`“${esc(m.keyword)}” <span class="mut small">${$('#ov-mkt').selectedOptions[0].text}</span>`;
+    $('#k-vol').textContent=fmt(m.volume);$('#k-broad').textContent=fmt(m.broad);$('#k-kd').innerHTML=`<span style="color:${kdColor(m.kd)}">${m.kd}</span><span class="small mut">/100</span>`;
+    $('#k-kdbar').style.cssText=`width:${m.kd}%;background:${kdColor(m.kd)}`;$('#k-kdl').textContent=m.kd_label+' (estimated)';
+    $('#k-comp').innerHTML=compBadge(m.competition);$('#k-compi').textContent='Index '+m.comp_index;$('#k-int').innerHTML=`<span class="badge i-${m.intent}">${m.intent}</span>`;
+    $('#k-words').textContent=m.words+' words'+(m.question?' · question':'');$('#k-opp').textContent=m.opportunity;
+    $('#k-trend').innerHTML=d.trend_change_4w==null?'—':(d.trend_change_4w>=0?`<span class="ok">▲ ${d.trend_change_4w}%</span>`:`<span style="color:#ff8a7a">▼ ${Math.abs(d.trend_change_4w)}%</span>`);
+    lineChart($('#ov-chart'),[d.trend.map(t=>t.impressions),d.trend.map(t=>t.broad)],d.trend.map(t=>t.date),['#2f81f7','#00b4a6']);
+    $('#ov-chart').insertAdjacentHTML('beforeend','<div class="small mut"><span style="color:#2f81f7">●</span> Exact &nbsp; <span style="color:#00b4a6">●</span> Broad (weekly impressions)</div>');
+    $('#ov-ctry').innerHTML='<thead><tr><th>Market</th><th class="n">Volume</th><th class="n">Broad</th><th class="n">Share</th></tr></thead><tbody>'+d.countries.map(c=>{const nm=(MARKETS.find(x=>x.country==c.country&&x.language==c.language)||{}).name||c.country;
+      return `<tr><td>${nm} <span class="mut small">${c.language}</span>${c.error?` <span class="small" style="color:#ff8a7a" title="${esc(c.error)}">⚠</span>`:''}</td><td class="n">${fmt(c.volume)}</td><td class="n">${fmt(c.broad)}</td><td class="n">${m.volume?(c.volume/m.volume*100).toFixed(1)+'%':'—'}</td></tr>`}).join('')+'</tbody>';
+  }catch(e){$('#ov-err').textContent=e.message}finally{busy(b,false)}};
+$('#ov-toideas').onclick=()=>{$('#id-kw').value=$('#ov-kw').value;$('#id-mkt').value=$('#ov-mkt').value;go('ideas');$('#id-go').click()};
+
+// ---------- ideas
+buildFilters('ideas','kw');buildFilters('bulk','kw');buildFilters('audit','audit');buildFilters('index','index');
+$('#id-kw').onkeydown=e=>{if(e.key=='Enter')$('#id-go').click()};
+$('#id-go').onclick=async()=>{const kw=$('#id-kw').value.trim();if(!kw)return;const b=$('#id-go');$('#id-err').textContent='';busy(b,true,'Collecting ideas…');
+  try{const d=await api('/api/ideas',{keyword:kw,market:$('#id-mkt').value,months:$('#id-months').value,limit:$('#id-limit').value,deep:$('#id-deep').checked});
+    DATA.ideas=d.rows;DATA.questions=d.rows.filter(r=>r.question);$('#id-out').style.display='';
+    const tv=d.rows.reduce((a,r)=>a+r.volume,0);$('#id-title').innerHTML=`${d.rows.length} keyword ideas for “${esc(d.seed)}” <span class="mut small">· total volume ${fmt(tv)}/mo · ${d.total_found} found</span>`;
+    if(d.notes.length)$('#id-err').textContent='Note: '+d.notes.join(' | ');refresh('ideas');
+    $('#q-title').textContent=`${DATA.questions.length} questions for “${d.seed}”`;render('questions',COLS.kw,DATA.questions);
+  }catch(e){$('#id-err').textContent=e.message}finally{busy(b,false)}};
+render('questions',COLS.kw,[]);
+
+// ---------- bulk
+$('#bk-list').oninput=()=>$('#bk-count').textContent=$('#bk-list').value.split('\n').filter(x=>x.trim()).length+' keywords';
+$('#bk-go').onclick=async()=>{const list=$('#bk-list').value.split('\n').filter(x=>x.trim());if(!list.length)return;const b=$('#bk-go');$('#bk-err').textContent='';busy(b,true,'Analyzing '+list.length);
+  try{const d=await api('/api/bulk',{keywords:list,market:$('#bk-mkt').value,months:$('#bk-months').value});DATA.bulk=d.rows;$('#bk-out').style.display='';refresh('bulk');
+    const er=d.rows.filter(r=>r.error);if(er.length)$('#bk-err').textContent=er.length+' keywords me error: '+er[0].error}catch(e){$('#bk-err').textContent=e.message}finally{busy(b,false)}};
+
+// ---------- site audit
+function siteVal(sel,man){return ($(man).value.trim()||$(sel).value)}
+async function loadSites(fresh){const d=await api('/api/sites',{fresh:!!fresh});SITES=d.sites;
+  const groups={};d.sites.forEach(x=>(groups[x.account_name]=groups[x.account_name]||[]).push(x));
+  const o='<option value="">— Select site —</option>'+Object.entries(groups).map(([g,xs])=>`<optgroup label="${esc(g)}">`+xs.map(x=>`<option value="${esc(x.url)}" data-acc="${x.account}">${esc(x.url)}${x.verified?'':' (not verified)'}</option>`).join('')+'</optgroup>').join('');
+  ['#au-site','#ix-site','#st-insite'].forEach(id=>{const v=$(id).value;$(id).innerHTML=o;$(id).value=v});
+  renderAccounts();return d}
+$('#au-load').onclick=async()=>{const b=$('#au-load');busy(b,true,'Loading');$('#au-err').textContent='';
+  try{const d=await loadSites(true);if(!d.sites.length)$('#au-err').textContent='Judi hui API keys ke accounts me koi site nahi mili.';if(d.errors.length)$('#au-err').textContent=d.errors.join(' | ')}catch(e){$('#au-err').textContent=e.message}finally{busy(b,false)}};
+function accOf(sel){const o=$(sel).selectedOptions[0];return o?o.dataset.acc:null}
+$('#au-go').onclick=async()=>{const site=siteVal('#au-site','#au-site-manual');if(!site){$('#au-err').textContent='Site chunein.';return}const b=$('#au-go');busy(b,true,'Auditing');$('#au-err').textContent='';
+  const account=$('#au-site-manual').value.trim()?null:accOf('#au-site');
+  try{const [sum,q,pg]=await Promise.all([api('/api/site/summary',{site,account}),api('/api/site/queries',{site,account}),api('/api/site/pages',{site,account}).catch(()=>({rows:[]}))]);
+    AUDIT={account,site,sum,q:q.rows,pages:pg.rows,issues:null,view:'kw'};$('#au-out').style.display='';$('#au-title').textContent='Audit: '+site;
+    const imp=q.rows.reduce((a,r)=>a+r.impressions,0),clk=q.rows.reduce((a,r)=>a+r.clicks,0);
+    const wp=q.rows.filter(r=>r.avg_position);const avg=wp.length?wp.reduce((a,r)=>a+r.avg_position*r.impressions,0)/Math.max(1,wp.reduce((a,r)=>a+r.impressions,0)):null;
+    $('#a-kws').textContent=fmt(q.rows.length);$('#a-top').textContent=`Top 3: ${q.rows.filter(r=>r.latest_position&&r.latest_position<=3).length} · Top 10: ${q.rows.filter(r=>r.latest_position&&r.latest_position<=10).length}`;
+    $('#a-imp').textContent=fmt(imp);$('#a-clk').textContent=fmt(clk);$('#a-ctr').textContent='CTR '+(imp?(clk/imp*100).toFixed(2):0)+'%';$('#a-pos').textContent=avg?avg.toFixed(1):'—';
+    const lc=sum.crawl&&sum.crawl.length?sum.crawl[sum.crawl.length-1]:null;$('#a-idx').textContent=lc?fmt(lc.in_index):'—';
+    $('#a-crawl').textContent=lc?`Crawled ${fmt(lc.crawled)} · errors ${fmt(lc.errors)} (${lc.date})`:(sum.crawl_error||'');
+    $('#a-quota').textContent=sum.quota?`${fmt(sum.quota.daily)} / ${fmt(sum.quota.monthly)}`:'—';
+    lineChart($('#au-chart'),[sum.traffic.map(t=>t.impressions),sum.traffic.map(t=>t.clicks)],sum.traffic.map(t=>t.date),['#2f81f7','#00b4a6']);
+    $('#au-chart').insertAdjacentHTML('beforeend','<div class="small mut"><span style="color:#2f81f7">●</span> Impressions &nbsp; <span style="color:#00b4a6">●</span> Clicks</div>');
+    const b1=(a,z)=>q.rows.filter(r=>r.latest_position&&r.latest_position>=a&&r.latest_position<z).length;
+    barChart($('#au-dist'),[['1-3',b1(0,3.5),'#2ecc71'],['4-10',b1(3.5,10.5),'#7bd36b'],['11-20',b1(10.5,20.5),'#f1c40f'],['21-50',b1(20.5,50.5),'#e67e22'],['51+',b1(50.5,1e9),'#e74c3c']]);
+    if(sum.quota)$('#ix-quota').textContent=`Submit quota: ${sum.quota.daily}/day, ${sum.quota.monthly}/month`;
+    auditView('kw')}catch(e){$('#au-err').textContent=e.message}finally{busy(b,false)}};
+$$('#au-sub button').forEach(b=>b.onclick=()=>auditView(b.dataset.s));
+async function auditView(v){$$('#au-sub button').forEach(x=>x.classList.toggle('on',x.dataset.s==v));AUDIT.view=v;$('#au-qp').style.display='none';
+  if(v=='issues'&&!AUDIT.issues){try{AUDIT.issues=(await api('/api/site/crawl-issues',{site:AUDIT.site,account:AUDIT.account})).rows}catch(e){AUDIT.issues=[];$('#au-err').textContent=e.message}}
+  DATA.audit=v=='kw'?AUDIT.q:v=='pages'?AUDIT.pages:v=='issues'?AUDIT.issues:AUDIT.q.filter(r=>r.latest_position>=4&&r.latest_position<=20).sort((a,b)=>b.impressions-a.impressions);
+  SORT.audit=null;refresh('audit')}
+async function queryPages(q){try{const d=await api('/api/site/query-pages',{site:AUDIT.site,account:AUDIT.account,query:q});$('#au-qp').style.display='';$('#au-qp-t').textContent=`Pages ranking for “${q}”`;
+  $('#tbl-qp').innerHTML='<thead><tr><th>URL</th><th class="n">Avg pos.</th><th class="n">Impressions</th><th class="n">Clicks</th></tr></thead><tbody>'+(d.rows.map(r=>`<tr><td><a href="${esc(r.url)}" target="_blank">${esc(r.url)}</a></td><td class="n"><b style="color:${posColor(r.avg_position)}">${r.avg_position??'—'}</b></td><td class="n">${fmt(r.impressions)}</td><td class="n">${fmt(r.clicks)}</td></tr>`).join('')||'<tr><td colspan=4 class="mut">No page data</td></tr>')+'</tbody>';
+  $('#au-qp').scrollIntoView({behavior:'smooth'})}catch(e){$('#au-err').textContent=e.message}}
+
+// ---------- URL index
+function ixSite(){return siteVal('#ix-site','#ix-site-manual')}
+function ixAcc(){return $('#ix-site-manual').value.trim()?null:accOf('#ix-site')}
+$('#ix-check').onclick=async()=>{const site=ixSite();$('#ix-err').textContent='';$('#ix-ok').textContent='';if(!site){$('#ix-err').textContent='Site chunein ya likhein.';return}
+  const urls=$('#ix-urls').value.split('\n').filter(x=>x.trim()),sm=$('#ix-sitemap').value.trim();if(!urls.length&&!sm){$('#ix-err').textContent='Sitemap URL ya URLs daalein.';return}
+  const b=$('#ix-check');busy(b,true,'Checking');
+  try{const d=await api('/api/site/check-urls',{site,account:ixAcc(),urls,sitemap:sm||null,cap:$('#ix-cap').value});DATA.index=d.rows;$('#ix-out').style.display='';
+    $('#ix-title').innerHTML=`${d.indexed} / ${d.total} URLs indexed <span class="mut small">· ${d.total-d.indexed} not indexed</span>`;refresh('index')}catch(e){$('#ix-err').textContent=e.message}finally{busy(b,false)}};
+$('#ix-sel-not').onclick=()=>$$('.ixsel').forEach(c=>{const r=DATA.index.find(x=>x.url==c.value);c.checked=r&&!r.indexed});
+function chosenUrls(){const sel=$$('.ixsel:checked').map(c=>c.value);return sel.length?sel:$('#ix-urls').value.split('\n').filter(x=>x.trim())}
+$('#ix-submit').onclick=async()=>{const site=ixSite(),urls=chosenUrls();$('#ix-err').textContent='';$('#ix-ok').textContent='';if(!site||!urls.length){$('#ix-err').textContent='Site aur URLs (ya table me select) chahiye.';return}
+  if(!confirm(`${urls.length} URLs Bing ko submit karein?`))return;const b=$('#ix-submit');busy(b,true,'Submitting');
+  try{const d=await api('/api/site/submit',{site,urls,account:ixAcc()});$('#ix-ok').textContent=`✓ ${d.submitted} URLs Bing Webmaster ko submit ho gaye.`}catch(e){$('#ix-err').textContent=e.message}finally{busy(b,false)}};
+$('#ix-indexnow').onclick=async()=>{const site=ixSite(),urls=chosenUrls();$('#ix-err').textContent='';$('#ix-ok').textContent='';if(!site||!urls.length){$('#ix-err').textContent='Site aur URLs chahiye.';return}
+  const b=$('#ix-indexnow');busy(b,true,'Sending');try{const d=await api('/api/site/indexnow',{site,urls});$('#ix-ok').textContent=`✓ IndexNow: ${d.submitted} URLs bheje (HTTP ${d.status}).`}catch(e){$('#ix-err').textContent=e.message}finally{busy(b,false)}};
+
+// ---------- history
+async function loadHistory(){const h=await api('/api/history');$('#tbl-history').innerHTML='<thead><tr><th>Time</th><th>Type</th><th>Query</th><th>Market</th></tr></thead><tbody>'+h.map(r=>`<tr><td>${r.time}</td><td>${r.kind}</td><td><a href="#" data-h="${esc(r.q)}" data-k="${r.kind}" data-m="${r.market}">${esc(r.q)}</a></td><td>${r.market=='world'?'Worldwide':r.market}</td></tr>`).join('')+'</tbody>';
+  $$('#tbl-history a').forEach(a=>a.onclick=e=>{e.preventDefault();if(a.dataset.k=='bulk')return;const t=a.dataset.k=='ideas'?'id':'ov';$('#'+t+'-kw').value=a.dataset.h;$('#'+t+'-mkt').value=a.dataset.m;go(a.dataset.k=='ideas'?'ideas':'overview');$('#'+t+'-go').click()})}
+
+// ---------- settings
+$('#st-insave').onclick=async()=>{const site=$('#st-insite').value;if(!site)return;await api('/api/config',{indexnow_site:site,indexnow_key:$('#st-inkey').value});$('#st-inkey').value='';$('#st-insave').textContent='Saved ✓';init()};
+$('#hdr-acc').onchange=async()=>{await api('/api/accounts/active',{id:$('#hdr-acc').value})};
+function renderAccounts(){const box=$('#ac-list');if(!CFG.accounts.length){box.innerHTML='<div class="mut">Abhi koi API key nahi judi.</div>';return}
+  box.innerHTML='<table><thead><tr><th>Name</th><th>API key</th><th>Sites</th><th>Added</th><th></th></tr></thead><tbody>'+CFG.accounts.map(a=>{const ss=SITES.filter(x=>x.account==a.id);
+   return `<tr><td><b>${esc(a.name)}</b>${a.id==CFG.active?' <span class="badge b-low">default</span>':''}</td><td><code>${esc(a.masked)}</code></td><td>${ss.length?ss.map(x=>esc(x.url)).join('<br>'):'<span class="mut">—</span>'}</td><td>${esc(a.added||'')}</td>
+   <td style="white-space:nowrap"><button class="btn sec" data-act="test" data-id="${a.id}">Test</button> <button class="btn sec" data-act="rename" data-id="${a.id}">Rename</button> <button class="btn sec" data-act="replace" data-id="${a.id}">Replace key</button> ${a.id!=CFG.active?`<button class="btn sec" data-act="default" data-id="${a.id}">Set default</button> `:''}<button class="btn" style="background:#a83232" data-act="remove" data-id="${a.id}">Remove</button></td></tr>`}).join('')+'</tbody></table>';
+  box.querySelectorAll('button[data-act]').forEach(b=>b.onclick=async()=>{const id=b.dataset.id,act=b.dataset.act;$('#ac-msg').textContent='';
+    try{if(act=='test'){busy(b,true,'');const d=await api('/api/test',{id});$('#ac-msg').innerHTML=`<span class="ok">✓ Key valid · ${d.sites.length} site(s)</span>`}
+      if(act=='rename'){const n=prompt('Naya naam:');if(!n)return;await api('/api/accounts/update',{id,name:n})}
+      if(act=='replace'){const k=prompt('Nayi API key paste karein:');if(!k)return;await api('/api/accounts/update',{id,apikey:k});$('#ac-msg').innerHTML='<span class="ok">✓ Key replace ho gayi.</span>'}
+      if(act=='default')await api('/api/accounts/active',{id});
+      if(act=='remove'){if(!confirm('Yeh API account hata dein?'))return;await api('/api/accounts/remove',{id})}
+      if(act!='test'){await init();await loadSites(true)}}catch(e){$('#ac-msg').innerHTML=`<span style="color:#ff8a7a">✗ ${esc(e.message)}</span>`}finally{if(act=='test')busy(b,false)}})}
+$('#ac-add').onclick=async()=>{const b=$('#ac-add');const key=$('#ac-key').value.trim();if(!key)return;busy(b,true,'Verifying');$('#ac-msg').textContent='';
+  try{const d=await api('/api/accounts/add',{name:$('#ac-name').value,apikey:key});$('#ac-key').value='';$('#ac-name').value='';
+    $('#ac-msg').innerHTML=`<span class="ok">✓ Key jud gayi aur save ho gayi. ${d.sites.length} site(s) mili.</span>`;await init();await loadSites(true)}catch(e){$('#ac-msg').innerHTML=`<span style="color:#ff8a7a">✗ ${esc(e.message)}</span>`}finally{busy(b,false)}};
+$('#ac-refresh').onclick=async()=>{const b=$('#ac-refresh');busy(b,true,'');try{const d=await loadSites(true);if(d.errors.length)$('#ac-msg').textContent=d.errors.join(' | ')}finally{busy(b,false)}};
+$('#st-wsave').onclick=async()=>{const w=$$('#st-world input:checked').map(i=>i.value);if(!w.length)return;await api('/api/config',{world_markets:w});$('#st-wsave').textContent='Saved ✓ ('+w.length+')'};
+$('#st-clear').onclick=async()=>{await api('/api/clear-cache',{});$('#st-clear').textContent='Cache cleared ✓'};
+</script>
+</body>
+</html>
